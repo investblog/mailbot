@@ -34,9 +34,11 @@ export async function ingest(env, cfg, ctx, owner, raw, from) {
   const outcome = await deliver(env, ctx, owner, msg);
 
   // Телеметрия + промо — только при успешной доставке, вне горячего пути.
+  // Один упорядоченный таск: инкремент ДОЛЖЕН лечь до чтения owner, иначе maybePromo
+  // прочитает старое otp_caught и правило «otp_caught >= 1 после кода» сработает лишь со след. письма.
   if (outcome.delivered && otp) {
-    ctx.waitUntil(incOwner(env, owner.id, 'otp_caught'));
     ctx.waitUntil((async () => {
+      await incOwner(env, owner.id, 'otp_caught');
       const full = await getOwnerById(env, owner.id);
       const shown = await maybePromo(env, cfg, owner, full);
       if (shown) await setLastPromo(env, owner.id);

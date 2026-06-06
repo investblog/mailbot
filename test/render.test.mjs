@@ -43,6 +43,17 @@ test('итог не превышает лимит при огромных subjec
   assert.ok(out.startsWith('🔑 <b>999111</b>'));
 });
 
+test('обрезка тела из <&> не рвёт HTML entity (нет malformed → нет 400)', () => {
+  const out = renderEmail({
+    from: 'a@b.c', subject: 's', body: '<&>'.repeat(5000), links: [], attachments: [], otp: '123456',
+  });
+  assert.ok(out.length <= TG_MSG_LIMIT, `длина ${out.length} > ${TG_MSG_LIMIT}`);
+  // каждый '&' обязан быть началом валидной entity — иначе срез попал внутрь &amp;/&lt;/&gt;
+  assert.ok(!/&(?!(amp|lt|gt);)/.test(out), 'найдена оборванная entity');
+  // и нет сырых угловых скобок из тела
+  assert.ok(!/<(?!b>|\/b>|code>|\/code>)/.test(out), 'найдена сырая <');
+});
+
 test('пустое тело даёт плейсхолдер', () => {
   const out = renderEmail({ from: 'a@b', subject: 's', body: '', links: [], attachments: [] });
   assert.match(out, /пустое тело/);

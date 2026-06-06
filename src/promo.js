@@ -19,7 +19,9 @@ export async function maybePromo(env, cfg, owner, row) {
   if (!(row.boxes_total >= 3 || row.otp_caught >= 3)) return false;
 
   // cid = owner.id — сквозная склейка bot → TDS → оплата, future-proof по клиентам.
-  const url = `${cfg.promoBase}?utm_source=gotemailbot&utm_campaign=otp_heavy&cid=${owner.id}`;
+  // encodeURIComponent: owner.id может содержать символы будущих клиентов, не тащим в query сырьём.
+  const cid = encodeURIComponent(owner.id);
+  const url = `${cfg.promoBase}?utm_source=gotemailbot&utm_campaign=otp_heavy&cid=${cid}`;
   const res = await sendMessage(
     env,
     owner.external_id,
