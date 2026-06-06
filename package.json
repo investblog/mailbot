@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test",
+    "test": "node --experimental-sqlite --test",
     "lint": "eslint .",
+    "check": "npm run lint && npm test && npx wrangler deploy --dry-run",
     "preflight": "node scripts/preflight.mjs",
     "dev": "wrangler dev",
     "predeploy": "npm run preflight",

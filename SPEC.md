@@ -8,6 +8,7 @@
 - **Домены:** `mailbot.click` (главный, не-RU) · `emailbot.ru` (RU-локаль)
 - **Аккаунты:** git/GitHub — **investblog**; Cloudflare — отдельный аккаунт проекта (Account ID `d36a36…`), доступ через выделенный API-токен. Детали — `cloudflare.md`.
 - **Принцип:** edge-first, zero-backend. Всё живёт на Cloudflare. Письма на MVP не хранятся — улетают в чат юзера и лежат там.
+- **Архитектура:** **Telegram-бот — первый клиент поверх email-core**, а не «весь сервис = Telegram». Ядро (приём/адреса/OTP/доставка) привязано к абстракции **owner**, не к `chat_id`. Это мост к будущему browser extension без переписывания ядра (см. §13).
 
 ---
 
@@ -17,7 +18,7 @@
 |---|---|
 | **Email Routing** (catch-all) | Приём входящей почты на доменах, проброс в Worker |
 | **Workers** | Ядро: `email()` приём + `fetch()` вебхук/ingest + `scheduled()` чистка |
-| **D1** | Маппинг (localpart, domain) → chat_id, профили юзеров, телеметрия |
+| **D1** | `owners` (владельцы + телеметрия) и `boxes` (адрес → owner_id) |
 | **KV** | Счётчики rate-limit (TTL-ключи), denylist отправителей |
 | **Cron Triggers** | Физическая чистка протухших адресов раз в час |
 | **R2** | *(только фаза 2, Mini App)* хранение сырого MIME |
@@ -31,15 +32,15 @@
 ```
 письмо → MX домена → Email Routing (catch-all)
        → Worker.email() → abuse-проверки (denylist + rate-limit)
-       → парс MIME (PostalMime) → извлечь OTP + тело
-       → D1: resolve (localpart, domain) → chat_id
-       → Telegram sendMessage (код первой строкой)
-       → исход доставки определяет SMTP-ответ (см. §5.5)
+       → D1: resolve (localpart, domain) → owner (JOIN boxes×owners)
+       → ingest(): парс MIME (PostalMime) → извлечь OTP + тело → нормализованное сообщение
+       → deliver(owner, msg): по owner.kind → (telegram) sendMessage; (future ext) message-event
+       → исход доставки определяет ответ источнику (см. §5.5)
 
-/start → Worker.fetch() /webhook → выбрать домен по локали → сгенерить localpart
-       → D1 insert → ответить юзеру адресом
+/start → Worker.fetch() /webhook → upsert owner(telegram) → выбрать домен по локали
+       → сгенерить localpart → D1 insert → ответить юзеру адресом
 
-план Б → Worker.fetch() /ingest (сырой MIME от своего MX) → тот же конвейер ingest()
+план Б → Worker.fetch() /ingest (сырой MIME от своего MX, internal-only) → тот же ingest()
 
 Cron (hourly) → Worker.scheduled() → D1 DELETE expires_at <= now
 ```
@@ -48,12 +49,20 @@ Cron (hourly) → Worker.scheduled() → D1 DELETE expires_at <= now
 
 ## 3. Компоненты Worker
 
+**Слои.** `index.js` — тонкий маршрутизатор входов. Бизнес-логика — в **email-core**, клиентское — в слое клиентов:
+
+```
+email-core (client-agnostic):  ingest · boxes · owners · otp · html · ratelimit · render
+delivery seam:                 delivery (deliver(owner, msg) — диспатч по owner.kind)
+clients:                       telegram bot (bot.js)  ·  future browser extension API (§13)
+```
+
 Один Worker (`src/index.js`), входы:
 
-- **`email(message, env, ctx)`** — приём из CF Email Routing. Резолв `message.to` → `(localpart, domain)` → D1. Нет адреса / протух / не наш домен → `setReject('550 …')`. Есть → общий конвейер `ingest()`.
+- **`email(message, env, ctx)`** — приём из CF Email Routing. Резолв `message.to` → `(localpart, domain)` → owner. Нет адреса / протух / не наш домен → `setReject('550 …')`. Есть → конвейер `ingest()`.
 - **`fetch(request, env, ctx)`** — два маршрута:
-  - `POST /webhook` — вебхук Telegram (защита через `secret_token`). Команды `/start`, `/help`, `/new`, кнопки. Промо-логика.
-  - `POST /ingest?to=&from=` — источник-агностичный приём сырого MIME от внешнего MX-релея (защита `Authorization: Bearer`). Делит конвейер `ingest()` с `email()`. Это зашитый **план Б** на случай отключения CF Email Routing. **Обязан проходить те же abuse-проверки** (denylist + rate-limit на адрес), что и `email()` — иначе релей становится обходом лимитов. Исход доставки зеркалит SMTP-политику: транзиентный сбой → `503` (релей ретраит), permanent → `200` (принято/дроп).
+  - `POST /webhook` — вебхук Telegram (защита `secret_token`, fail-closed). Команды `/start`, `/help`, `/new`, кнопки.
+  - `POST /ingest?to=&from=` — **внутренний** приём сырого MIME от MX-релея (защита `Authorization: Bearer`), **не публичный API**. Делит `ingest()` с `email()`. Зашитый **план Б** при отключении CF Email Routing. Те же abuse-проверки и порядок, что в `email()`. Исход: транзиент → `503` (релей ретраит), permanent/ok → `200`.
 - **`scheduled(event, env, ctx)`** — Cron. Физическое удаление протухших строк из D1 (логически мертвы по `expires_at`).
 
 ---
@@ -62,32 +71,38 @@ Cron (hourly) → Worker.scheduled() → D1 DELETE expires_at <= now
 
 **Почему D1, а не KV:** на горячем флоу (`/start` → вставка адреса → OTP через 10–20 сек) KV с eventual consistency может вернуть `null` (запись в одном colo, чтение в другом) — письмо теряется. D1 strongly consistent.
 
+**Owner-oriented.** Адресами владеет `owner` (тип задаётся `kind`). Telegram — первый клиент (`kind='telegram'`, `external_id=chat_id`, `id='tg:<chat_id>'`). `box.owner_id` ссылается на `owners.id`.
+
 **Ключ адреса составной** `(localpart, domain)` — из-за мультидомена: `x7k2p9a1@mailbot.click` и `x7k2p9a1@emailbot.ru` — разные адреса.
 
 ```sql
+CREATE TABLE owners (
+  id           TEXT PRIMARY KEY,    -- opaque, kind-specific (telegram: "tg:<chat_id>")
+  kind         TEXT NOT NULL,       -- telegram | extension | account
+  external_id  TEXT,                -- chat_id для telegram; device/account id в будущем
+  locale       TEXT,                -- для выбора домена
+  sessions     INTEGER DEFAULT 1,
+  boxes_total  INTEGER DEFAULT 0,
+  otp_caught   INTEGER DEFAULT 0,
+  last_promo   INTEGER,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL,
+  UNIQUE (kind, external_id)
+);
+
 CREATE TABLE boxes (
   localpart   TEXT NOT NULL,        -- x7k2p9a1
   domain      TEXT NOT NULL,        -- mailbot.click | emailbot.ru
-  chat_id     INTEGER NOT NULL,
+  owner_id    TEXT NOT NULL,        -- → owners.id
   created_at  INTEGER NOT NULL,
   expires_at  INTEGER NOT NULL,     -- now + 24h; продление двигает вперёд
   PRIMARY KEY (localpart, domain)
 );
-CREATE INDEX idx_boxes_chat ON boxes(chat_id);
-CREATE INDEX idx_boxes_exp  ON boxes(expires_at);
-
-CREATE TABLE users (
-  chat_id      INTEGER PRIMARY KEY,
-  locale       TEXT,                -- language_code из TG, для выбора домена
-  sessions     INTEGER DEFAULT 1,   -- возвратность
-  boxes_total  INTEGER DEFAULT 0,   -- адресов создано
-  otp_caught   INTEGER DEFAULT 0,   -- кодов поймано
-  last_promo   INTEGER,             -- дата последнего промо
-  created_at   INTEGER NOT NULL
-);
+CREATE INDEX idx_boxes_owner ON boxes(owner_id);
+CREATE INDEX idx_boxes_exp   ON boxes(expires_at);
 ```
 
-TTL логический (`expires_at > now` в запросе на приём), физическая чистка отдельно Cron'ом: протухание мгновенное, удаление не блокирует горячий путь.
+Горячий путь резолва — один JOIN-запрос (`boxes × owners`), отдаёт срок + идентичность владельца (`kind`/`external_id`) для доставки. TTL логический (`expires_at > now`), физическая чистка — Cron'ом: протухание мгновенное, удаление не блокирует горячий путь.
 
 ---
 
@@ -124,16 +139,18 @@ TTL логический (`expires_at > now` в запросе на приём),
 - Лимиты: subject 200, from 120, ссылок ≤5 (по 200), вложений ≤10 (имя ≤100). Вложения — только строкой `📎 имя_файла`, файл дропаем.
 - Превью ссылок отключено (`link_preview_options.is_disabled`). Покрыто `test/render.test.mjs`.
 
-### 5.5 Политика отказа доставки в Telegram
-`sendMessage` — это и есть «доставка». **Важно:** Cloudflare Email Workers НЕ умеют сигналить transient/temporary-сбой — `message.setReject()` всегда **permanent** ([Runtime API](https://developers.cloudflare.com/email-routing/email-workers/runtime-api/)), механизма defer/retry нет. Поэтому:
+### 5.5 Доставка и политика отказа (`src/delivery.js`, `src/telegram.js`)
+Доставка идёт через seam **`deliver(owner, msg)`** — диспатч по `owner.kind`. Для `telegram`: `renderEmail(msg)` → `sendMessage(chat_id)`. Для будущего `extension`/`account` — запись message-event в D1/R2 (§13). `ingest()` про клиента не знает.
 
-1. **Транзиент добиваем ретраем внутри вызова.** `sendMessage` повторяет до 3 раз на `429`/`5xx`/сети (уважая `Retry-After` ≤ 5с) — `src/telegram.js`.
-2. После ретраев решает `ingest()`:
+**Важно:** Cloudflare Email Workers НЕ умеют сигналить transient/temporary — `message.setReject()` всегда **permanent** ([Runtime API](https://developers.cloudflare.com/email-routing/email-workers/runtime-api/)), defer/retry нет. Поэтому:
+
+1. **Транзиент добиваем ретраем внутри транспорта.** `sendMessage` повторяет до 3 раз на `429`/`5xx`/сети (уважая `Retry-After` ≤ 5с).
+2. После ретраев классифицирует `deliver()`:
 
 | Ситуация | Класс | `email()` (CF Routing) | `/ingest` (свой релей) | Доп. действие |
 |---|---|---|---|---|
 | `2xx` ok | delivered | принять | `200 ok` | `otp_caught++`, промо |
-| `403` бот заблокирован | permanent | принять (дроп) | `200` | **снести адреса чата** (`deleteBoxesForChat`) |
+| `403` бот заблокирован | permanent | принять (дроп) | `200` | **снести адреса владельца** (`deleteBoxesForOwner`) |
 | `400` (форматирование) / битый MIME | permanent | принять (дроп) | `200` | залогировать |
 | `429`/`5xx`/сеть после ретраев | transient | **принять (дроп)** + лог | **`503`** (релей ретраит) | — |
 
@@ -145,8 +162,10 @@ TTL логический (`expires_at > now` в запросе на приём),
 
 ## 6. Бот: команды и UX (`src/bot.js`)
 
-- `/start` — upsert юзера (+session, locale), выбор домена по локали. Если активный адрес есть — показать его, не плодить; иначе создать.
-- `/new` (кнопка «Новый адрес») — новый localpart, с учётом лимита активных.
+Бот — клиентский слой: маппит Telegram `chat_id` → `owner(kind='telegram')` и зовёт core-функции.
+
+- `/start` — `upsertOwner` (+session, locale), выбор домена по локали. Если активный адрес есть — показать его, не плодить; иначе создать.
+- `/new` (кнопка «Новый адрес») — `ensureOwner` (без +session) + новый localpart, с учётом лимита активных.
 - `/help` — что это, TTL, приватность, «не для важной почты».
 - Кнопки: `Новый адрес` · `Продлить` · `Помощь`.
 - Тон **сухой, инженерный**, без пафоса — аудитория техническая.
@@ -162,7 +181,8 @@ TTL логический (`expires_at > now` в запросе на приём),
 - **Что** = «вебмастер» (`boxes_total >= 3` или `otp_caught >= 3`) → оффер; обычный физик → тишина.
 - **Частота** = не чаще раза в 30 дней (`last_promo`).
 - **Момент** = отдельным сообщением **после** пойманного кода.
-- **Атрибуция** = `301.st/?utm_source=gotemailbot&utm_campaign=otp_heavy&cid={chat_id}`.
+- **Атрибуция** = `301.st/?utm_source=gotemailbot&utm_campaign=otp_heavy&cid={owner.id}` (owner.id сквозной по клиентам).
+- Промо-канал MVP — только `kind='telegram'`; у будущего клиента своя поверхность.
 
 > `301.st` — только цель промо в коде, не аккаунт проекта.
 
@@ -171,10 +191,10 @@ TTL логический (`expires_at > now` в запросе на приём),
 ## 8. Защита от абьюза
 
 - **Rate-limit на адрес** (KV-счётчик TTL): `RL_PER_HOUR` писем/час, выше — `550`. Применяется и в `email()`, и в `/ingest` (общий код `src/ratelimit.js`).
-- **Rate-limit на создание адресов** на chat_id: `NEW_PER_HOUR` и `NEW_PER_DAY` (KV-счётчики). Закрывает бесконечную ротацию `/new` в обход лимита активных. Применяется ко всем путям создания (`/start`, `/new`, кнопка).
+- **Rate-limit на создание адресов** на owner: `NEW_PER_HOUR` и `NEW_PER_DAY` (KV-счётчики по `owner.id`). Закрывает бесконечную ротацию `/new` в обход лимита активных. Применяется ко всем путям создания (`/start`, `/new`, кнопка).
 - **Denylist отправителей** (KV-ключ `deny:{from}`) — тоже в обоих входах.
 - **Неизвестный/протухший адрес / не наш домен** → `550`, не молчаливый дроп (чище для репутации).
-- **Лимит активных адресов** на chat_id (`MAX_ACTIVE_BOXES`, дефолт 2): при создании сверх лимита сносятся самые старые.
+- **Лимит активных адресов** на owner (`MAX_ACTIVE_BOXES`, дефолт 2): при создании сверх лимита сносятся самые старые.
 - **Лимит размера письма** (`MAX_RAW_KB`, дефолт 1 MiB): больше — отбой ДО парса (`552`/`413`), не тратим CPU на парс гигантских MIME (Email Routing допускает до 25 MiB).
 - **Порядок проверок:** домен → размер → denylist → resolve box → rate-limit. Rate-limit пишет KV, поэтому идёт ПОСЛЕ resolve — иначе любой случайный localpart на catch-all домене раздувал бы KV-writes.
 - **Вебхук `/webhook` — fail-closed:** без заданного `TG_SECRET` отдаёт `503` (не публичный fail-open). `/ingest` — аналогично требует `INGEST_SECRET`.
@@ -225,7 +245,37 @@ Vars (с дефолтами, переопределяются на деплое)
 
 ## 12. Качество кода и CI
 
-- **Тесты** (`npm test` → `node --test`, без зависимостей): `test/otp.test.mjs` (acceptance OTP), `test/ratelimit.test.mjs` (abuse-логика на fake KV), `test/render.test.mjs` (escaping + итоговая длина).
+- **Тесты** (`npm test` → `node --experimental-sqlite --test`): `otp` (acceptance), `ratelimit` (fake KV), `render` (escaping + длина), `boxes` (owner/box lifecycle на настоящем SQLite через `node:sqlite`-шим `test/helpers/d1.mjs`), `delivery` (success/permanent 403–400/transient, `fetch` замокан). Итого 32 теста.
 - **Lint** (`npm run lint` → ESLint flat config): Worker-глобалы для `src/`, node для тестов/скриптов; правила `no-undef`, `no-unused-vars`, `no-constant-condition`, `eqeqeq`.
+- **`npm run check`** = lint + test + dry-run (одной командой).
 - **CI** (`.github/workflows/ci.yml`): `npm ci` → `lint` → `test` → `wrangler deploy --dry-run`. Lockfile (`package-lock.json`) коммитится.
 - **Deploy guard** (`npm run preflight`, авто-`predeploy`): блокирует деплой при плейсхолдерах `<id>` в `wrangler.jsonc` и напоминает про обязательные секреты.
+
+---
+
+## 13. Future clients / Browser Extension (вне MVP)
+
+Зафиксировано как контракт, **в текущем MVP не реализуется**. Цель раздела — чтобы ядро уже было готово, а расширение добавлялось отдельной фазой.
+
+**Клиенты email-core:**
+- **Telegram bot** — первый клиент (реализован). Письма не хранятся: доставляются только в чат.
+- **Browser extension** — будущий второй клиент (`owner.kind='extension'`/`'account'`). Расширение должно само показывать OTP/inbox, поэтому потребует **хранения входящих событий с TTL** (D1/R2), в отличие от Telegram.
+
+**Auth (решение позже, не сейчас):**
+- `TG_SECRET`/`INGEST_SECRET` — **НЕ** user-auth и расширением не используются (`TG_SECRET` — доверие к Telegram, `INGEST_SECRET` — к своему MX-релею).
+- Для расширения — отдельная модель: anonymous device token / account token / passkey. Выбор отложен.
+- `/ingest` остаётся **internal-only** (MX-релей), не публичный API.
+
+**Future Extension API (контракт, помечен вне MVP):**
+```
+POST   /api/session            — выдать/обновить device/account токен
+GET    /api/boxes              — список адресов владельца
+POST   /api/boxes             — создать адрес
+POST   /api/boxes/:id/extend  — продлить
+DELETE /api/boxes/:id         — удалить
+GET    /api/messages          — входящие события (только если включено хранение)
+GET    /api/messages/:id      — одно событие
+```
+Правила: требует user/device auth; `/api/messages` доступен только при включённом хранении; все события с TTL; raw MIME и вложения в extension-MVP не хранить без отдельного решения.
+
+**Delivery seam уже готов:** `deliver(owner, msg)` диспатчит по `owner.kind`. Добавление клиента = новая ветка `deliver` (запись события) + чтение через API, **без правок ingest/boxes/otp/html**.

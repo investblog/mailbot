@@ -1,38 +1,38 @@
-// Вебхук Telegram: команды /start /new /help и кнопки. Тон сухой, инженерный.
+// Клиент: Telegram-бот поверх email-core. Команды /start /new /help + кнопки.
+// Маппит Telegram chat_id → owner(kind='telegram'); вся логика адресов — в core.
 
 import { config, pickDomain } from './config.js';
-import {
-  createBox, activeBoxes, enforceActiveLimit, extendBox,
-  touchUser, getUser, incUser,
-} from './boxes.js';
+import { createBox, activeBoxes, enforceActiveLimit, extendBox } from './boxes.js';
+import { upsertOwner, ensureOwner, incOwner } from './owners.js';
 import { sendMessage, answerCallback, keyboard, esc } from './telegram.js';
 import { newBoxLimited } from './ratelimit.js';
+
+const KIND = 'telegram';
 
 const KB = keyboard([
   [{ text: 'Новый адрес', callback_data: 'new' }, { text: 'Продлить', callback_data: 'extend' }],
   [{ text: 'Помощь', callback_data: 'help' }],
 ]);
 
+const RL_MSG = 'Слишком часто. Лимит новых адресов исчерпан — попробуй позже.';
+
 function fmtAddress(address, expiresAt) {
   const hours = Math.max(0, Math.round((expiresAt - Date.now() / 1000) / 3600));
   return `Адрес: <code>${esc(address)}</code>\nЖивёт ~${hours} ч. Всё, что придёт, прилетит сюда.`;
 }
 
-// Создаёт адрес. Возвращает box, либо null если упёрлись в rate-limit на /new.
-async function newAddress(env, cfg, chatId, user) {
-  if (await newBoxLimited(env, cfg, chatId)) return null;
-  await enforceActiveLimit(env, chatId, cfg.maxActive);
-  const domain = pickDomain(cfg.domains, user?.locale);
-  const box = await createBox(env, chatId, domain, cfg.ttlHours);
-  await incUser(env, chatId, 'boxes_total');
+// Создаёт адрес для владельца. null если упёрлись в rate-limit на /new.
+async function newAddress(env, cfg, owner, locale) {
+  if (await newBoxLimited(env, cfg, owner.id)) return null;
+  await enforceActiveLimit(env, owner.id, cfg.maxActive);
+  const domain = pickDomain(cfg.domains, locale);
+  const box = await createBox(env, owner.id, domain, cfg.ttlHours);
+  await incOwner(env, owner.id, 'boxes_total');
   return box;
 }
 
-const RL_MSG = 'Слишком часто. Лимит новых адресов исчерпан — попробуй позже.';
-
 export async function handleUpdate(update, env) {
   const cfg = config(env);
-
   if (update.callback_query) return handleCallback(update.callback_query, env, cfg);
   if (update.message) return handleMessage(update.message, env, cfg);
 }
@@ -44,28 +44,26 @@ async function handleMessage(msg, env, cfg) {
   const locale = msg.from?.language_code;
 
   if (text.startsWith('/start')) {
-    const user = await touchUser(env, chatId, locale);
-    // Если есть активный адрес — показываем его, не плодим.
-    const active = await activeBoxes(env, chatId);
+    const owner = await upsertOwner(env, KIND, chatId, locale); // /start = заход, +session
+    const active = await activeBoxes(env, owner.id);
     if (active.length) {
       const b = active[0];
       return sendMessage(env, chatId, fmtAddress(`${b.localpart}@${b.domain}`, b.expires_at), KB);
     }
-    const box = await newAddress(env, cfg, chatId, user);
+    const box = await newAddress(env, cfg, owner, locale);
     if (!box) return sendMessage(env, chatId, RL_MSG, KB);
     return sendMessage(env, chatId, fmtAddress(box.address, box.expires_at), KB);
   }
 
   if (text.startsWith('/new')) {
-    const user = await getUser(env, chatId) || await touchUser(env, chatId, locale);
-    const box = await newAddress(env, cfg, chatId, user);
+    const owner = await ensureOwner(env, KIND, chatId, locale); // без +session
+    const box = await newAddress(env, cfg, owner, locale);
     if (!box) return sendMessage(env, chatId, RL_MSG, KB);
     return sendMessage(env, chatId, fmtAddress(box.address, box.expires_at), KB);
   }
 
   if (text.startsWith('/help')) return sendHelp(env, chatId);
 
-  // Любое другое сообщение — короткая подсказка.
   return sendMessage(env, chatId, 'Команды: /start · /new · /help', KB);
 }
 
@@ -73,10 +71,11 @@ async function handleCallback(cq, env, cfg) {
   const chatId = cq.message?.chat?.id;
   const data = cq.data;
   if (!chatId) return answerCallback(env, cq.id);
+  const locale = cq.from?.language_code;
 
   if (data === 'new') {
-    const user = await getUser(env, chatId);
-    const box = await newAddress(env, cfg, chatId, user);
+    const owner = await ensureOwner(env, KIND, chatId, locale);
+    const box = await newAddress(env, cfg, owner, locale);
     if (!box) {
       await sendMessage(env, chatId, RL_MSG, KB);
       return answerCallback(env, cq.id, 'Лимит');
@@ -86,7 +85,8 @@ async function handleCallback(cq, env, cfg) {
   }
 
   if (data === 'extend') {
-    const active = await activeBoxes(env, chatId);
+    const owner = await ensureOwner(env, KIND, chatId, locale);
+    const active = await activeBoxes(env, owner.id);
     if (!active.length) {
       await sendMessage(env, chatId, 'Активных адресов нет. /new — создать.', KB);
       return answerCallback(env, cq.id);

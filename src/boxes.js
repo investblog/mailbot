@@ -1,4 +1,4 @@
-// Адреса: генерация, коллизии, резолв, лимиты. Вся работа с таблицами boxes/users.
+// email-core: адреса (генерация, коллизии, резолв, лимиты). Привязка к OWNER, не к клиенту.
 
 import { now } from './config.js';
 
@@ -15,13 +15,13 @@ function randomLocalpart() {
   return s;
 }
 
-// Создать адрес: генерим localpart, проверяем что не занят живым, до N ретраев.
-export async function createBox(env, chatId, domain, ttlHours) {
+// Создать адрес для владельца: генерим localpart, проверяем что не занят живым, до N ретраев.
+export async function createBox(env, ownerId, domain, ttlHours) {
   const t = now();
   const expires = t + ttlHours * 3600;
   for (let i = 0; i < MAX_GEN_RETRIES; i++) {
     const localpart = randomLocalpart();
-    // INSERT упадёт на PK-коллизии (в т.ч. с протухшей строкой) — чистим протухшую и ретраим.
+    // PK = (localpart, domain). Коллизия с протухшей строкой — чистим и переиспользуем.
     const existing = await env.DB
       .prepare('SELECT expires_at FROM boxes WHERE localpart = ? AND domain = ?')
       .bind(localpart, domain).first();
@@ -31,34 +31,40 @@ export async function createBox(env, chatId, domain, ttlHours) {
         .bind(localpart, domain).run();
     }
     await env.DB
-      .prepare('INSERT INTO boxes (localpart, domain, chat_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(localpart, domain, chatId, t, expires).run();
+      .prepare('INSERT INTO boxes (localpart, domain, owner_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(localpart, domain, ownerId, t, expires).run();
     return { localpart, domain, address: `${localpart}@${domain}`, expires_at: expires };
   }
   throw new Error('localpart generation exhausted retries');
 }
 
-// Резолв входящего адреса → активный box (или null если нет/протух).
+// Резолв входящего адреса → владелец + срок (или null если нет/протух).
+// JOIN, чтобы один round-trip отдавал и идентичность владельца (kind/external_id) для доставки.
 export async function resolveBox(env, localpart, domain) {
-  const row = await env.DB
-    .prepare('SELECT chat_id, expires_at FROM boxes WHERE localpart = ? AND domain = ?')
-    .bind(localpart, domain).first();
+  const row = await env.DB.prepare(
+    `SELECT b.owner_id, b.expires_at, o.kind, o.external_id
+     FROM boxes b JOIN owners o ON o.id = b.owner_id
+     WHERE b.localpart = ? AND b.domain = ?`
+  ).bind(localpart, domain).first();
   if (!row) return null;
   if (row.expires_at <= now()) return null; // логически протух
-  return row;
+  return {
+    expires_at: row.expires_at,
+    owner: { id: row.owner_id, kind: row.kind, external_id: row.external_id },
+  };
 }
 
-// Активные адреса юзера (для показа/лимита).
-export async function activeBoxes(env, chatId) {
+// Активные адреса владельца (для показа/лимита).
+export async function activeBoxes(env, ownerId) {
   const { results } = await env.DB
-    .prepare('SELECT localpart, domain, expires_at FROM boxes WHERE chat_id = ? AND expires_at > ? ORDER BY created_at DESC')
-    .bind(chatId, now()).all();
+    .prepare('SELECT localpart, domain, expires_at FROM boxes WHERE owner_id = ? AND expires_at > ? ORDER BY created_at DESC')
+    .bind(ownerId, now()).all();
   return results || [];
 }
 
 // Удержать лимит активных: сносим самые старые сверх (maxActive - 1), освобождая место под новый.
-export async function enforceActiveLimit(env, chatId, maxActive) {
-  const boxes = await activeBoxes(env, chatId);
+export async function enforceActiveLimit(env, ownerId, maxActive) {
+  const boxes = await activeBoxes(env, ownerId);
   const keep = Math.max(0, maxActive - 1);
   const drop = boxes.slice(keep); // boxes отсортированы новые→старые
   for (const b of drop) {
@@ -67,9 +73,9 @@ export async function enforceActiveLimit(env, chatId, maxActive) {
   }
 }
 
-// Снести все адреса чата (напр. юзер заблокировал бота — доставка невозможна).
-export async function deleteBoxesForChat(env, chatId) {
-  await env.DB.prepare('DELETE FROM boxes WHERE chat_id = ?').bind(chatId).run();
+// Снести все адреса владельца (напр. клиент недоступен — доставка невозможна).
+export async function deleteBoxesForOwner(env, ownerId) {
+  await env.DB.prepare('DELETE FROM boxes WHERE owner_id = ?').bind(ownerId).run();
 }
 
 // Продлить адрес на ttlHours от текущего момента.
@@ -79,28 +85,4 @@ export async function extendBox(env, localpart, domain, ttlHours) {
     .prepare('UPDATE boxes SET expires_at = ? WHERE localpart = ? AND domain = ?')
     .bind(expires, localpart, domain).run();
   return expires;
-}
-
-// --- users ---
-
-export async function touchUser(env, chatId, locale) {
-  const t = now();
-  // upsert: новый — created, существующий — +1 session и обновляем локаль.
-  await env.DB.prepare(
-    `INSERT INTO users (chat_id, locale, sessions, created_at)
-     VALUES (?, ?, 1, ?)
-     ON CONFLICT(chat_id) DO UPDATE SET sessions = sessions + 1, locale = excluded.locale`
-  ).bind(chatId, locale || null, t).run();
-  return getUser(env, chatId);
-}
-
-export async function getUser(env, chatId) {
-  return env.DB.prepare('SELECT * FROM users WHERE chat_id = ?').bind(chatId).first();
-}
-
-export async function incUser(env, chatId, field) {
-  const cols = { boxes_total: 'boxes_total', otp_caught: 'otp_caught' };
-  if (!cols[field]) return;
-  await env.DB.prepare(`UPDATE users SET ${cols[field]} = ${cols[field]} + 1 WHERE chat_id = ?`)
-    .bind(chatId).run();
 }

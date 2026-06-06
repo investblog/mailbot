@@ -1,20 +1,16 @@
-// gotemailbot — один Worker, три входа: email() приём, fetch() вебхук, scheduled() чистка.
+// gotemailbot — маршрутизатор входов Worker: email() приём, fetch() вебхук/ingest, scheduled() чистка.
+// Бизнес-логика — в email-core (ingest/boxes/owners/...). Здесь только разбор входа и abuse-проверки.
 
-import PostalMime from 'postal-mime';
 import { config, now } from './config.js';
-import { resolveBox, getUser, incUser, deleteBoxesForChat } from './boxes.js';
-import { extractOtp } from './otp.js';
-import { htmlToText } from './html.js';
-import { sendMessage } from './telegram.js';
-import { renderEmail } from './render.js';
+import { resolveBox } from './boxes.js';
 import { handleUpdate } from './bot.js';
-import { maybePromo } from './promo.js';
+import { ingest } from './ingest.js';
 import { isDenied, addressLimited } from './ratelimit.js';
 
 export default {
   // === Приём почты от Cloudflare Email Routing ===
   // Email Workers НЕ умеют transient/4xx-отказ: setReject — всегда permanent.
-  // Поэтому транзиентный сбой доставки добиваем ретраем в sendMessage, иначе принимаем и дропаем.
+  // Транзиент доставки добивается ретраем в транспорте; иначе письмо принимается и дропается.
   async email(message, env, ctx) {
     const cfg = config(env);
     const to = String(message.to || '').toLowerCase();
@@ -36,12 +32,11 @@ export default {
     if (await addressLimited(env, cfg, to)) return message.setReject('550 5.7.1 rate limited');
 
     const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
-    await ingest(env, cfg, ctx, box.chat_id, raw, from);
-    // Исход доставки не влияет на SMTP-ответ: транзиент уже отретраен внутри,
-    // постоянный сбой принимаем (permanent-bounce на временный сбой TG был бы хуже потери).
+    await ingest(env, cfg, ctx, box.owner, raw, from);
+    // Исход доставки не влияет на SMTP-ответ (transient уже отретраен; permanent-bounce был бы хуже потери).
   },
 
-  // === Вебхук Telegram + (на будущее) HTTP-приём писем от своего релея ===
+  // === Вебхук Telegram + (план Б) HTTP-приём писем от своего MX-релея ===
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
@@ -59,8 +54,8 @@ export default {
       return new Response('ok');
     }
 
-    // Источник-агностичный приём: свой MX-релей (Yandex/VPS) шлёт сырой MIME сюда.
-    // Plan B обязан проходить ТЕ ЖЕ abuse-проверки, что и email(), иначе релей = обход лимитов.
+    // /ingest — ВНУТРЕННИЙ endpoint для MX-релея (план Б), НЕ публичный API.
+    // Проходит те же abuse-проверки и порядок, что email().
     if (request.method === 'POST' && url.pathname === '/ingest') {
       if (!env.INGEST_SECRET ||
           request.headers.get('authorization') !== `Bearer ${env.INGEST_SECRET}`) {
@@ -70,7 +65,6 @@ export default {
       const to = (url.searchParams.get('to') || '').toLowerCase();
       const from = (url.searchParams.get('from') || '').toLowerCase();
       const [localpart, domain] = splitAddr(to);
-      // Тот же порядок и набор abuse-проверок, что в email().
       if (!localpart || !cfg.domains.includes(domain)) return new Response('no such user', { status: 550 });
       const sizeHdr = Number(request.headers.get('content-length') || 0);
       if (sizeHdr > cfg.maxRawBytes) return new Response('message too large', { status: 413 });
@@ -80,8 +74,8 @@ export default {
       if (await addressLimited(env, cfg, to)) return new Response('rate limited', { status: 550 });
       const raw = new Uint8Array(await request.arrayBuffer());
       if (raw.byteLength > cfg.maxRawBytes) return new Response('message too large', { status: 413 });
-      const r = await ingest(env, cfg, ctx, box.chat_id, raw, from);
-      // Здесь transient-ретрай возможен на стороне релея: транзиент → 503, иначе принято.
+      const r = await ingest(env, cfg, ctx, box.owner, raw, from);
+      // На релее ретрай возможен: транзиент → 503, иначе принято.
       if (!r.delivered && !r.permanent) return new Response('retry later', { status: 503 });
       return new Response('ok');
     }
@@ -96,59 +90,6 @@ export default {
     );
   },
 };
-
-// --- общий конвейер обработки письма (источник-агностичный) ---
-// Возвращает исход доставки: { delivered, permanent }.
-//  - delivered:true            — ушло в TG, считаем доставленным;
-//  - delivered:false permanent:true  — доставка невозможна (бот заблокирован / битый запрос) → принять и дропнуть;
-//  - delivered:false permanent:false — транзиентный сбой (429/5xx/сеть) → вызывающий просит ретрай.
-async function ingest(env, cfg, ctx, chatId, raw, from) {
-  let parsed;
-  try {
-    parsed = await PostalMime.parse(raw);
-  } catch (e) {
-    console.error('parse failed', e);
-    return { delivered: false, permanent: true }; // битый MIME ретраить бессмысленно
-  }
-
-  const subject = parsed.subject || '(без темы)';
-  let body = parsed.text || '';
-  let links = [];
-  if (!body && parsed.html) {
-    const out = await htmlToText(parsed.html);
-    body = out.text;
-    links = out.links;
-  }
-
-  const otp = extractOtp(subject, body);
-  const attachments = (parsed.attachments || []).map((a) => a.filename || 'файл');
-
-  const msg = renderEmail({ from, subject, body, links, otp, attachments });
-  const res = await sendMessage(env, chatId, msg); // ретрай транзиента — внутри
-
-  if (!res.ok) {
-    // 403 — бот заблокирован: доставка невозможна, чистим адреса чата (снижаем abuse-поверхность).
-    if (res.status === 403) {
-      ctx.waitUntil(deleteBoxesForChat(env, chatId));
-      return { delivered: false, permanent: true };
-    }
-    // 400 — наша ошибка форматирования: ретрай не поможет, логируем и дропаем.
-    if (res.status === 400) return { delivered: false, permanent: true };
-    // 429 / 5xx / сеть — транзиент (уже отретраен в sendMessage). email() дропает,
-    // /ingest отдаёт 503 (там ретрай возможен на стороне релея).
-    return { delivered: false, permanent: false };
-  }
-
-  // Доставлено: телеметрия + промо вне горячего пути.
-  if (otp) {
-    ctx.waitUntil(incUser(env, chatId, 'otp_caught'));
-    ctx.waitUntil((async () => {
-      const user = await getUser(env, chatId);
-      await maybePromo(env, cfg, chatId, user);
-    })());
-  }
-  return { delivered: true };
-}
 
 // --- helpers ---
 function splitAddr(addr) {

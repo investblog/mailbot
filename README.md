@@ -7,26 +7,32 @@
 ## Структура
 
 ```
-src/
-  index.js     три входа: email() / fetch() / scheduled() + ingest()
-  bot.js       вебхук: /start /new /help + кнопки
-  boxes.js     адреса (генерация/коллизии/лимиты) + users
+src/  (email-core — client-agnostic)
+  index.js     маршрутизатор входов: email() / fetch() / scheduled()
+  ingest.js    конвейер письма: parse → нормализация → deliver()
+  boxes.js     адреса (генерация/коллизии/лимиты), привязка к owner_id
+  owners.js    владельцы (upsert/ensure) + телеметрия
   otp.js       скоринговый OTP-экстрактор (порог >= 4)
   html.js      HTML→текст через HTMLRewriter
+  ratelimit.js общие abuse-проверки (denylist, rate-limit на адрес и /new)
+  config.js    конфиг из env, выбор домена по локали
+src/  (delivery seam)
+  delivery.js  deliver(owner, msg) — диспатч по owner.kind
+src/  (clients)
+  bot.js       Telegram: /start /new /help + кнопки
   telegram.js  TG Bot API + escape + ретрай транзиента
   render.js    сборка TG-сообщения с контролем итоговой длины
-  ratelimit.js общие abuse-проверки (denylist, rate-limit на адрес и /new)
   promo.js     кросс-промо 301.st
-  config.js    конфиг из env, выбор домена по локали
-test/          otp / ratelimit / render (npm test)
+test/          otp / ratelimit / render / boxes / delivery
+  helpers/d1.mjs  D1-шим над node:sqlite
 scripts/
   preflight.mjs deploy guard (npm run preflight)
-schema.sql     D1: boxes (PK localpart+domain), users
+schema.sql     D1: owners + boxes (PK localpart+domain)
 wrangler.jsonc конфиг Worker
 .github/workflows/ci.yml  npm ci → lint → test → dry-run
 ```
 
-Проверки: `npm test` · `npm run lint` · `npm run preflight` (всё без сети, кроме install).
+Проверки: `npm run check` (lint + test + dry-run) · по отдельности `npm test` / `npm run lint`.
 
 ## Деплой
 
