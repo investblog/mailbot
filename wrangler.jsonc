@@ -7,9 +7,11 @@
   "compatibility_flags": ["nodejs_compat"],
 
   // Домены приёма. RU-локаль → .ru, остальные → нейтральный домен.
-  // Можно переопределить на деплое; resolve в email() принимает любой из списка.
+  // ВРЕМЕННО только mailbot.click: на emailbot.ru уже стоит Yandex MX, Email Routing
+  // там не включён (снос чужих MX = решение владельца). Вернуть "mailbot.click,emailbot.ru"
+  // после настройки приёма на emailbot.ru. resolve в email() принимает любой из списка.
   "vars": {
-    "DOMAINS": "mailbot.click,emailbot.ru",
+    "DOMAINS": "mailbot.click",
     "PROMO_BASE": "https://301.st/",
     "BOX_TTL_HOURS": "24",
     "MAX_ACTIVE_BOXES": "2",
@@ -20,10 +22,10 @@
   },
 
   "d1_databases": [
-    { "binding": "DB", "database_name": "gotemail", "database_id": "<id>" }
+    { "binding": "DB", "database_name": "gotemail", "database_id": "399e1409-02c7-45f8-a0bd-47da37b2ed56" }
   ],
   "kv_namespaces": [
-    { "binding": "RL", "id": "<id>" }
+    { "binding": "RL", "id": "99a6ced205984068809c8ac8e159e9ad" }
   ],
   "triggers": { "crons": ["0 * * * *"] },
 
