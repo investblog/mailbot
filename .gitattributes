@@ -1,0 +1,8 @@
+# Нормализуем переводы строк: в репозитории всегда LF.
+* text=auto eol=lf
+
+# Бинарные — не трогать.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary

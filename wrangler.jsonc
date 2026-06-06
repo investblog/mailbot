@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gotemailbot",
+  "main": "src/index.js",
+  "compatibility_date": "2026-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Домены приёма. RU-локаль → .ru, остальные → нейтральный домен.
+  // Можно переопределить на деплое; resolve в email() принимает любой из списка.
+  "vars": {
+    "DOMAINS": "emailbot.ru,emailbot.io",
+    "PROMO_BASE": "https://301.st/",
+    "BOX_TTL_HOURS": "24",
+    "MAX_ACTIVE_BOXES": "2",
+    "RL_PER_HOUR": "30"
+  },
+
+  "d1_databases": [
+    { "binding": "DB", "database_name": "gotemail", "database_id": "<id>" }
+  ],
+  "kv_namespaces": [
+    { "binding": "RL", "id": "<id>" }
+  ],
+  "triggers": { "crons": ["0 * * * *"] },
+
+  "observability": { "enabled": true }
+}
