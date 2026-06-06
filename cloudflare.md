@@ -6,8 +6,9 @@
 
 | Параметр | Значение |
 |---|---|
-| Аккаунт | **investblog** |
+| CF-аккаунт | отдельный аккаунт проекта; доступ wrangler — через выделенный API-токен (`CLOUDFLARE_API_TOKEN`), не через интерактивный логин |
 | Account ID | `d36a36cd1d5b17048d3b20a4c32aa7c7` (не секрет; прописан в `wrangler.jsonc`) |
+| Git/GitHub | **investblog** (отдельно от CF) |
 | Главный домен (не-RU) | `mailbot.click` |
 | RU-домен | `emailbot.ru` |
 | Worker | `gotemailbot` |

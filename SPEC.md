@@ -6,7 +6,7 @@
 
 - **Бот:** `@gotemailbot` («Temp Mail — Disposable Email & OTP»)
 - **Домены:** `mailbot.click` (главный, не-RU) · `emailbot.ru` (RU-локаль)
-- **Аккаунт:** investblog (git + Cloudflare). Детали инфраструктуры — `cloudflare.md`.
+- **Аккаунты:** git/GitHub — **investblog**; Cloudflare — отдельный аккаунт проекта (Account ID `d36a36…`), доступ через выделенный API-токен. Детали — `cloudflare.md`.
 - **Принцип:** edge-first, zero-backend. Всё живёт на Cloudflare. Письма на MVP не хранятся — улетают в чат юзера и лежат там.
 
 ---
