@@ -5,37 +5,40 @@ import { config, now } from './config.js';
 import { resolveBox, getUser, incUser, deleteBoxesForChat } from './boxes.js';
 import { extractOtp } from './otp.js';
 import { htmlToText } from './html.js';
-import { sendMessage, esc } from './telegram.js';
+import { sendMessage } from './telegram.js';
+import { renderEmail } from './render.js';
 import { handleUpdate } from './bot.js';
 import { maybePromo } from './promo.js';
 import { isDenied, addressLimited } from './ratelimit.js';
 
-const BODY_LIMIT = 3400; // лимит TG 4096, оставляем место под заголовки
-
 export default {
   // === Приём почты от Cloudflare Email Routing ===
+  // Email Workers НЕ умеют transient/4xx-отказ: setReject — всегда permanent.
+  // Поэтому транзиентный сбой доставки добиваем ретраем в sendMessage, иначе принимаем и дропаем.
   async email(message, env, ctx) {
     const cfg = config(env);
     const to = String(message.to || '').toLowerCase();
     const from = String(message.from || '').toLowerCase();
     const [localpart, domain] = splitAddr(to);
 
+    // Порядок: домен → размер → denylist → resolve → rate-limit → доставка.
+    // (rate-limit пишет KV — не делаем это для несуществующих адресов на catch-all домене.)
     if (!localpart || !cfg.domains.includes(domain)) {
       return message.setReject('550 5.1.1 no such user');
     }
-    // Abuse-проверки: denylist отправителя + rate-limit на адрес.
+    if (message.rawSize > cfg.maxRawBytes) {
+      return message.setReject('552 5.3.4 message too large'); // permanent — на ретрае не уменьшится
+    }
     if (await isDenied(env, from)) return message.setReject('550 5.7.1 sender denied');
-    if (await addressLimited(env, cfg, to)) return message.setReject('550 5.7.1 rate limited');
 
     const box = await resolveBox(env, localpart, domain);
     if (!box) return message.setReject('550 5.1.1 no such user');
+    if (await addressLimited(env, cfg, to)) return message.setReject('550 5.7.1 rate limited');
 
     const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
-    const r = await ingest(env, cfg, ctx, box.chat_id, raw, from);
-    // Транзиентный сбой доставки в TG → 451, чтобы отправляющий MX ретраил.
-    if (!r.delivered && !r.permanent) {
-      return message.setReject('451 4.7.0 temporary delivery failure, retry later');
-    }
+    await ingest(env, cfg, ctx, box.chat_id, raw, from);
+    // Исход доставки не влияет на SMTP-ответ: транзиент уже отретраен внутри,
+    // постоянный сбой принимаем (permanent-bounce на временный сбой TG был бы хуже потери).
   },
 
   // === Вебхук Telegram + (на будущее) HTTP-приём писем от своего релея ===
@@ -43,9 +46,12 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === 'POST' && url.pathname === '/webhook') {
-      // Защита вебхука секретным токеном (Telegram шлёт его в заголовке).
-      if (env.TG_SECRET &&
-          request.headers.get('x-telegram-bot-api-secret-token') !== env.TG_SECRET) {
+      // Fail-closed: без TG_SECRET вебхук недоступен (иначе любой шлёт фейковые updates).
+      if (!env.TG_SECRET) {
+        console.error('TG_SECRET not set — webhook disabled');
+        return new Response('webhook misconfigured', { status: 503 });
+      }
+      if (request.headers.get('x-telegram-bot-api-secret-token') !== env.TG_SECRET) {
         return new Response('forbidden', { status: 403 });
       }
       const update = await request.json().catch(() => null);
@@ -64,14 +70,18 @@ export default {
       const to = (url.searchParams.get('to') || '').toLowerCase();
       const from = (url.searchParams.get('from') || '').toLowerCase();
       const [localpart, domain] = splitAddr(to);
+      // Тот же порядок и набор abuse-проверок, что в email().
       if (!localpart || !cfg.domains.includes(domain)) return new Response('no such user', { status: 550 });
+      const sizeHdr = Number(request.headers.get('content-length') || 0);
+      if (sizeHdr > cfg.maxRawBytes) return new Response('message too large', { status: 413 });
       if (await isDenied(env, from)) return new Response('sender denied', { status: 550 });
-      if (await addressLimited(env, cfg, to)) return new Response('rate limited', { status: 550 });
       const box = await resolveBox(env, localpart, domain);
       if (!box) return new Response('no such user', { status: 550 });
+      if (await addressLimited(env, cfg, to)) return new Response('rate limited', { status: 550 });
       const raw = new Uint8Array(await request.arrayBuffer());
+      if (raw.byteLength > cfg.maxRawBytes) return new Response('message too large', { status: 413 });
       const r = await ingest(env, cfg, ctx, box.chat_id, raw, from);
-      // Зеркалим политику email(): транзиентный сбой → 503 (релей ретраит), иначе принято.
+      // Здесь transient-ретрай возможен на стороне релея: транзиент → 503, иначе принято.
       if (!r.delivered && !r.permanent) return new Response('retry later', { status: 503 });
       return new Response('ok');
     }
@@ -114,7 +124,7 @@ async function ingest(env, cfg, ctx, chatId, raw, from) {
   const attachments = (parsed.attachments || []).map((a) => a.filename || 'файл');
 
   const msg = renderEmail({ from, subject, body, links, otp, attachments });
-  const res = await sendMessage(env, chatId, msg);
+  const res = await sendMessage(env, chatId, msg); // ретрай транзиента — внутри
 
   if (!res.ok) {
     // 403 — бот заблокирован: доставка невозможна, чистим адреса чата (снижаем abuse-поверхность).
@@ -124,7 +134,8 @@ async function ingest(env, cfg, ctx, chatId, raw, from) {
     }
     // 400 — наша ошибка форматирования: ретрай не поможет, логируем и дропаем.
     if (res.status === 400) return { delivered: false, permanent: true };
-    // 429 / 5xx / сеть — транзиентно: просим ретрай (SMTP 451 / HTTP 503).
+    // 429 / 5xx / сеть — транзиент (уже отретраен в sendMessage). email() дропает,
+    // /ingest отдаёт 503 (там ретрай возможен на стороне релея).
     return { delivered: false, permanent: false };
   }
 
@@ -137,31 +148,6 @@ async function ingest(env, cfg, ctx, chatId, raw, from) {
     })());
   }
   return { delivered: true };
-}
-
-function renderEmail({ from, subject, body, links, otp, attachments }) {
-  const parts = [];
-  // Код первой строкой: жирным + дублем в <code> (тап = копирование).
-  if (otp) parts.push(`🔑 <b>${esc(otp)}</b>  <code>${esc(otp)}</code>`);
-  parts.push(`<b>${esc(subject)}</b>`);
-  parts.push(`от: ${esc(from)}`);
-  parts.push('');
-
-  let text = body || '(пустое тело)';
-  if (text.length > BODY_LIMIT) text = text.slice(0, BODY_LIMIT) + '…';
-  parts.push(esc(text));
-
-  if (links && links.length) {
-    parts.push('');
-    parts.push('🔗 ссылки:');
-    // Сырой URL plain Telegram сам делает кликабельным.
-    for (const l of links) parts.push(esc(l));
-  }
-  if (attachments && attachments.length) {
-    parts.push('');
-    for (const a of attachments) parts.push(`📎 ${esc(a)}`);
-  }
-  return parts.join('\n');
 }
 
 // --- helpers ---

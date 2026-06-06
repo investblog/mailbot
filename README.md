@@ -13,17 +13,20 @@ src/
   boxes.js     адреса (генерация/коллизии/лимиты) + users
   otp.js       скоринговый OTP-экстрактор (порог >= 4)
   html.js      HTML→текст через HTMLRewriter
-  telegram.js  TG Bot API + escape
+  telegram.js  TG Bot API + escape + ретрай транзиента
+  render.js    сборка TG-сообщения с контролем итоговой длины
   ratelimit.js общие abuse-проверки (denylist, rate-limit на адрес и /new)
   promo.js     кросс-промо 301.st
   config.js    конфиг из env, выбор домена по локали
-test/
-  otp.test.mjs acceptance-контракт OTP (npm test)
+test/          otp / ratelimit / render (npm test)
+scripts/
+  preflight.mjs deploy guard (npm run preflight)
 schema.sql     D1: boxes (PK localpart+domain), users
 wrangler.jsonc конфиг Worker
+.github/workflows/ci.yml  npm ci → lint → test → dry-run
 ```
 
-Тесты: `npm test` (node --test, без зависимостей).
+Проверки: `npm test` · `npm run lint` · `npm run preflight` (всё без сети, кроме install).
 
 ## Деплой
 

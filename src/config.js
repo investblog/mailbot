@@ -10,6 +10,7 @@ export function config(env) {
     rlPerHour: Number(env.RL_PER_HOUR || 30),
     newPerHour: Number(env.NEW_PER_HOUR || 5),
     newPerDay: Number(env.NEW_PER_DAY || 20),
+    maxRawBytes: Number(env.MAX_RAW_KB || 1024) * 1024, // дефолт 1 MiB; больше — reject до парса
     promoBase: env.PROMO_BASE || 'https://301.st/',
   };
 }

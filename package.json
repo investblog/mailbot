@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "lint": "eslint .",
+    "preflight": "node scripts/preflight.mjs",
     "dev": "wrangler dev",
+    "predeploy": "npm run preflight",
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute gotemail --file=./schema.sql --remote",
     "db:init:local": "wrangler d1 execute gotemail --file=./schema.sql --local"
@@ -14,6 +17,8 @@
     "postal-mime": "^2.4.4"
   },
   "devDependencies": {
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
     "wrangler": "^4.0.0"
   }
 }
