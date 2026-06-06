@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS boxes (
   localpart   TEXT NOT NULL,        -- x7k2p9a1 (алфавит без 0/o/1/l/i)
-  domain      TEXT NOT NULL,        -- emailbot.ru | emailbot.io
+  domain      TEXT NOT NULL,        -- mailbot.click | emailbot.ru
   chat_id     INTEGER NOT NULL,
   created_at  INTEGER NOT NULL,     -- unix seconds
   expires_at  INTEGER NOT NULL,     -- now + TTL; продление двигает вперёд

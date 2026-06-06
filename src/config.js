@@ -8,6 +8,8 @@ export function config(env) {
     ttlHours: Number(env.BOX_TTL_HOURS || 24),
     maxActive: Number(env.MAX_ACTIVE_BOXES || 2),
     rlPerHour: Number(env.RL_PER_HOUR || 30),
+    newPerHour: Number(env.NEW_PER_HOUR || 5),
+    newPerDay: Number(env.NEW_PER_DAY || 20),
     promoBase: env.PROMO_BASE || 'https://301.st/',
   };
 }

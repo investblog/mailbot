@@ -13,7 +13,9 @@
     "PROMO_BASE": "https://301.st/",
     "BOX_TTL_HOURS": "24",
     "MAX_ACTIVE_BOXES": "2",
-    "RL_PER_HOUR": "30"
+    "RL_PER_HOUR": "30",
+    "NEW_PER_HOUR": "5",
+    "NEW_PER_DAY": "20"
   },
 
   "d1_databases": [

@@ -67,6 +67,11 @@ export async function enforceActiveLimit(env, chatId, maxActive) {
   }
 }
 
+// Снести все адреса чата (напр. юзер заблокировал бота — доставка невозможна).
+export async function deleteBoxesForChat(env, chatId) {
+  await env.DB.prepare('DELETE FROM boxes WHERE chat_id = ?').bind(chatId).run();
+}
+
 // Продлить адрес на ttlHours от текущего момента.
 export async function extendBox(env, localpart, domain, ttlHours) {
   const expires = now() + ttlHours * 3600;

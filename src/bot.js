@@ -6,6 +6,7 @@ import {
   touchUser, getUser, incUser,
 } from './boxes.js';
 import { sendMessage, answerCallback, keyboard, esc } from './telegram.js';
+import { newBoxLimited } from './ratelimit.js';
 
 const KB = keyboard([
   [{ text: 'Новый адрес', callback_data: 'new' }, { text: 'Продлить', callback_data: 'extend' }],
@@ -17,13 +18,17 @@ function fmtAddress(address, expiresAt) {
   return `Адрес: <code>${esc(address)}</code>\nЖивёт ~${hours} ч. Всё, что придёт, прилетит сюда.`;
 }
 
+// Создаёт адрес. Возвращает box, либо null если упёрлись в rate-limit на /new.
 async function newAddress(env, cfg, chatId, user) {
+  if (await newBoxLimited(env, cfg, chatId)) return null;
   await enforceActiveLimit(env, chatId, cfg.maxActive);
   const domain = pickDomain(cfg.domains, user?.locale);
   const box = await createBox(env, chatId, domain, cfg.ttlHours);
   await incUser(env, chatId, 'boxes_total');
   return box;
 }
+
+const RL_MSG = 'Слишком часто. Лимит новых адресов исчерпан — попробуй позже.';
 
 export async function handleUpdate(update, env) {
   const cfg = config(env);
@@ -47,12 +52,14 @@ async function handleMessage(msg, env, cfg) {
       return sendMessage(env, chatId, fmtAddress(`${b.localpart}@${b.domain}`, b.expires_at), KB);
     }
     const box = await newAddress(env, cfg, chatId, user);
+    if (!box) return sendMessage(env, chatId, RL_MSG, KB);
     return sendMessage(env, chatId, fmtAddress(box.address, box.expires_at), KB);
   }
 
   if (text.startsWith('/new')) {
     const user = await getUser(env, chatId) || await touchUser(env, chatId, locale);
     const box = await newAddress(env, cfg, chatId, user);
+    if (!box) return sendMessage(env, chatId, RL_MSG, KB);
     return sendMessage(env, chatId, fmtAddress(box.address, box.expires_at), KB);
   }
 
@@ -70,6 +77,10 @@ async function handleCallback(cq, env, cfg) {
   if (data === 'new') {
     const user = await getUser(env, chatId);
     const box = await newAddress(env, cfg, chatId, user);
+    if (!box) {
+      await sendMessage(env, chatId, RL_MSG, KB);
+      return answerCallback(env, cq.id, 'Лимит');
+    }
     await sendMessage(env, chatId, fmtAddress(box.address, box.expires_at), KB);
     return answerCallback(env, cq.id, 'Готово');
   }

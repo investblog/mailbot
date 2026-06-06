@@ -8,16 +8,22 @@ export function esc(s) {
 }
 
 async function call(env, method, payload) {
-  const res = await fetch(`${API}${env.TG_TOKEN}/${method}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  let res;
+  try {
+    res = await fetch(`${API}${env.TG_TOKEN}/${method}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error(`TG ${method} network error: ${e}`);
+    return { ok: false, status: 0 }; // сетевой сбой → транзиентный
+  }
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
     console.error(`TG ${method} ${res.status}: ${detail}`);
   }
-  return res;
+  return { ok: res.ok, status: res.status };
 }
 
 export function sendMessage(env, chatId, text, opts = {}) {

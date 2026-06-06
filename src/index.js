@@ -2,12 +2,13 @@
 
 import PostalMime from 'postal-mime';
 import { config, now } from './config.js';
-import { resolveBox, getUser, incUser } from './boxes.js';
+import { resolveBox, getUser, incUser, deleteBoxesForChat } from './boxes.js';
 import { extractOtp } from './otp.js';
 import { htmlToText } from './html.js';
 import { sendMessage, esc } from './telegram.js';
 import { handleUpdate } from './bot.js';
 import { maybePromo } from './promo.js';
+import { isDenied, addressLimited } from './ratelimit.js';
 
 const BODY_LIMIT = 3400; // лимит TG 4096, оставляем место под заголовки
 
@@ -22,15 +23,19 @@ export default {
     if (!localpart || !cfg.domains.includes(domain)) {
       return message.setReject('550 5.1.1 no such user');
     }
-    // Rate-limit на адрес + denylist отправителя.
+    // Abuse-проверки: denylist отправителя + rate-limit на адрес.
     if (await isDenied(env, from)) return message.setReject('550 5.7.1 sender denied');
-    if (await rateLimited(env, cfg, to)) return message.setReject('550 5.7.1 rate limited');
+    if (await addressLimited(env, cfg, to)) return message.setReject('550 5.7.1 rate limited');
 
     const box = await resolveBox(env, localpart, domain);
     if (!box) return message.setReject('550 5.1.1 no such user');
 
     const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
-    await ingest(env, cfg, ctx, box.chat_id, raw, from);
+    const r = await ingest(env, cfg, ctx, box.chat_id, raw, from);
+    // Транзиентный сбой доставки в TG → 451, чтобы отправляющий MX ретраил.
+    if (!r.delivered && !r.permanent) {
+      return message.setReject('451 4.7.0 temporary delivery failure, retry later');
+    }
   },
 
   // === Вебхук Telegram + (на будущее) HTTP-приём писем от своего релея ===
@@ -49,6 +54,7 @@ export default {
     }
 
     // Источник-агностичный приём: свой MX-релей (Yandex/VPS) шлёт сырой MIME сюда.
+    // Plan B обязан проходить ТЕ ЖЕ abuse-проверки, что и email(), иначе релей = обход лимитов.
     if (request.method === 'POST' && url.pathname === '/ingest') {
       if (!env.INGEST_SECRET ||
           request.headers.get('authorization') !== `Bearer ${env.INGEST_SECRET}`) {
@@ -59,10 +65,14 @@ export default {
       const from = (url.searchParams.get('from') || '').toLowerCase();
       const [localpart, domain] = splitAddr(to);
       if (!localpart || !cfg.domains.includes(domain)) return new Response('no such user', { status: 550 });
+      if (await isDenied(env, from)) return new Response('sender denied', { status: 550 });
+      if (await addressLimited(env, cfg, to)) return new Response('rate limited', { status: 550 });
       const box = await resolveBox(env, localpart, domain);
       if (!box) return new Response('no such user', { status: 550 });
       const raw = new Uint8Array(await request.arrayBuffer());
-      ctx.waitUntil(ingest(env, cfg, ctx, box.chat_id, raw, from));
+      const r = await ingest(env, cfg, ctx, box.chat_id, raw, from);
+      // Зеркалим политику email(): транзиентный сбой → 503 (релей ретраит), иначе принято.
+      if (!r.delivered && !r.permanent) return new Response('retry later', { status: 503 });
       return new Response('ok');
     }
 
@@ -78,13 +88,17 @@ export default {
 };
 
 // --- общий конвейер обработки письма (источник-агностичный) ---
+// Возвращает исход доставки: { delivered, permanent }.
+//  - delivered:true            — ушло в TG, считаем доставленным;
+//  - delivered:false permanent:true  — доставка невозможна (бот заблокирован / битый запрос) → принять и дропнуть;
+//  - delivered:false permanent:false — транзиентный сбой (429/5xx/сеть) → вызывающий просит ретрай.
 async function ingest(env, cfg, ctx, chatId, raw, from) {
   let parsed;
   try {
     parsed = await PostalMime.parse(raw);
   } catch (e) {
     console.error('parse failed', e);
-    return;
+    return { delivered: false, permanent: true }; // битый MIME ретраить бессмысленно
   }
 
   const subject = parsed.subject || '(без темы)';
@@ -100,16 +114,29 @@ async function ingest(env, cfg, ctx, chatId, raw, from) {
   const attachments = (parsed.attachments || []).map((a) => a.filename || 'файл');
 
   const msg = renderEmail({ from, subject, body, links, otp, attachments });
-  await sendMessage(env, chatId, msg);
+  const res = await sendMessage(env, chatId, msg);
 
-  // Телеметрия + промо — вне горячего пути.
-  if (otp) ctx.waitUntil(incUser(env, chatId, 'otp_caught'));
-  ctx.waitUntil((async () => {
-    if (otp) {
+  if (!res.ok) {
+    // 403 — бот заблокирован: доставка невозможна, чистим адреса чата (снижаем abuse-поверхность).
+    if (res.status === 403) {
+      ctx.waitUntil(deleteBoxesForChat(env, chatId));
+      return { delivered: false, permanent: true };
+    }
+    // 400 — наша ошибка форматирования: ретрай не поможет, логируем и дропаем.
+    if (res.status === 400) return { delivered: false, permanent: true };
+    // 429 / 5xx / сеть — транзиентно: просим ретрай (SMTP 451 / HTTP 503).
+    return { delivered: false, permanent: false };
+  }
+
+  // Доставлено: телеметрия + промо вне горячего пути.
+  if (otp) {
+    ctx.waitUntil(incUser(env, chatId, 'otp_caught'));
+    ctx.waitUntil((async () => {
       const user = await getUser(env, chatId);
       await maybePromo(env, cfg, chatId, user);
-    }
-  })());
+    })());
+  }
+  return { delivered: true };
 }
 
 function renderEmail({ from, subject, body, links, otp, attachments }) {
@@ -142,19 +169,4 @@ function splitAddr(addr) {
   const at = addr.lastIndexOf('@');
   if (at < 1) return [null, null];
   return [addr.slice(0, at), addr.slice(at + 1)];
-}
-
-async function isDenied(env, from) {
-  if (!from) return false;
-  const hit = await env.RL.get(`deny:${from}`);
-  return hit !== null;
-}
-
-// KV-счётчик с TTL. Не атомарно (KV это не умеет) — для MVP достаточно.
-async function rateLimited(env, cfg, address) {
-  const key = `rl:${address}`;
-  const cur = Number((await env.RL.get(key)) || 0);
-  if (cur >= cfg.rlPerHour) return true;
-  await env.RL.put(key, String(cur + 1), { expirationTtl: 3600 });
-  return false;
 }

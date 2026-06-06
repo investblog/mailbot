@@ -8,17 +8,22 @@
 
 ```
 src/
-  index.js     три входа: email() / fetch() / scheduled()
+  index.js     три входа: email() / fetch() / scheduled() + ingest()
   bot.js       вебхук: /start /new /help + кнопки
   boxes.js     адреса (генерация/коллизии/лимиты) + users
   otp.js       скоринговый OTP-экстрактор (порог >= 4)
   html.js      HTML→текст через HTMLRewriter
   telegram.js  TG Bot API + escape
+  ratelimit.js общие abuse-проверки (denylist, rate-limit на адрес и /new)
   promo.js     кросс-промо 301.st
   config.js    конфиг из env, выбор домена по локали
+test/
+  otp.test.mjs acceptance-контракт OTP (npm test)
 schema.sql     D1: boxes (PK localpart+domain), users
 wrangler.jsonc конфиг Worker
 ```
+
+Тесты: `npm test` (node --test, без зависимостей).
 
 ## Деплой
 
