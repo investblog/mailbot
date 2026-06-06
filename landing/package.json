@@ -1,0 +1,21 @@
+{
+  "name": "gotemailbot-landing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:icons": "node scripts/build-icons.mjs",
+    "build:i18n": "node scripts/build-i18n.mjs",
+    "dev": "npm run build:icons && vite",
+    "build": "npm run build:icons && tsc --noEmit && vite build && npm run build:i18n",
+    "build:ru": "npm run build && node scripts/build-ru.mjs",
+    "preview": "npm run build && vite preview",
+    "deploy": "npm run build && wrangler pages deploy public/ --project-name gotemailbot-landing",
+    "deploy:ru": "npm run build:ru && wrangler pages deploy public-ru/ --project-name gotemailbot-ru"
+  },
+  "devDependencies": {
+    "svgo": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

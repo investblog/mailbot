@@ -1,0 +1,325 @@
+/* =========================
+   301.st – THEME TOKENS
+   - Цвета
+   - Типографика
+   - Базовые переменные
+   ========================= */
+
+/*!
+ * UI System 1.0 — Unified control recipe
+ * This file defines the single source of truth for control sizing.
+ * All interactive components MUST consume these tokens. Do not override
+ * padding/height in variants (primary/ghost/danger/social/chips).
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Blues (primary brand) */
+  --blue-900: #003682;
+  --blue-700: #0055DC;
+  --blue-500: #3475C0;
+  --blue-300: #408BC9;
+  --blue-neon: #4DA3FF;
+
+  /* Oranges (Cloudflare-ish family) */
+  --orange-500: #F48120;
+  --orange-700: #F38020;
+  --orange-900: #C65000;
+
+  /*
+    Cloudflare CTA accent.
+
+    Chosen to keep CF vibe but pass WCAG AA with WHITE text:
+    - #C24F00 on #FFFFFF ≈ 4.76:1
+    - #C24F00 on #000000 ≈ 4.41:1
+  */
+  --accent-cf: #C24F00;
+  --accent-cf-hover: #E05A00;
+  --accent-cf-soft: rgba(244, 129, 32, 0.16);
+
+  /* Neutrals */
+  --gray-950: #000000;
+  --gray-900: #111111;
+  --gray-800: #222222;
+  --gray-700: #333333;
+  --gray-600: #404242;
+  --gray-500: #424242;
+  --gray-400: #808080;
+
+  --gray-50:  #F8FBFB;
+  --gray-100: #F7F7F8;
+  --gray-200: #F4F8FC;
+  --gray-250: #EAEBEB;
+  --gray-300: #E5E5E4;
+  --gray-350: #CAC8C8;
+
+  /* Semantic */
+  --danger: #FF4F6E;
+  --success: #18C27A;
+  --warning: #FFB347;
+  --info: #3B82F6;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI", sans-serif;
+
+  /* Base type scale */
+  --fs-body: 1rem;
+  --lh-body: 1.5;
+
+  /* Unified control system — font-driven sizing */
+  --fs-control: clamp(0.94rem, 0.92rem + 0.2vw, 0.98rem);
+  --lh-control: 1.25;
+
+  /* Control spacing (relative, no px) */
+  --control-pad-y: 0.35em;
+  --control-pad-x: 0.90em;
+  --border-1: 1px;
+  --indicator-thickness: 1px; /* For loading bar & global notice border */
+  --control-min-height: calc(
+    1em * var(--lh-control) +
+    2 * var(--control-pad-y) +
+    2 * var(--border-1)
+  );
+
+  /* Radius & layout spacing */
+  --r-pill: 999px;
+  --r-field: 0.75rem;
+  --control-radius: var(--r-pill);
+  --inline-gap: 0.5rem;
+  --stack-gap: 0.75rem;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Spacing & radii */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* Control sizing */
+  --control-scale-sm: 0.9;
+  --control-scale-md: 1;
+  --control-scale-lg: 1.1;
+
+  --radius-md: var(--radius);
+
+  --radius-xs: 0.25rem;
+  --radius: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --border-width-thin: 1px;
+  --border-width-strong: 1px;
+
+  --shadow-sm-light: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md-light: 0 6px 18px rgba(0, 0, 0, 0.12);
+  --shadow-lg-light: 0 18px 45px rgba(0, 0, 0, 0.25);
+
+  --shadow-sm-dark: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md-dark: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-lg-dark: 0 18px 45px rgba(0, 0, 0, 0.65);
+
+  --shadow-sm: var(--shadow-sm-light);
+  --shadow-md: var(--shadow-md-light);
+  --shadow-lg: var(--shadow-lg-light);
+
+  --shadow-soft:   0 1px 3px  color-mix(in srgb, var(--gray-900) 18%, transparent),
+                   0 1px 2px  color-mix(in srgb, var(--gray-900) 22%, transparent);
+  --shadow-subtle: 0 3px 6px  color-mix(in srgb, var(--gray-900) 16%, transparent),
+                   0 1px 4px  color-mix(in srgb, var(--gray-900) 20%, transparent);
+
+  --border-width: 1px;
+  --border-style: solid;
+
+  --transition-fast: 120ms ease-out;
+  --transition-md: 160ms ease-out;
+
+  /* Z-index scale - ascending order */
+  --z-base: 1;           /* Base elevated elements (utility-bar) */
+  --z-indicator: 2;      /* Visual indicators (loading-bar, logo overlay) */
+  --z-elevated: 10;      /* Elevated UI elements */
+  --z-dropdown: 20;      /* Dropdowns, popovers */
+  --z-sticky: 30;        /* Sticky headers */
+  --z-global-notice: 100; /* Global alerts (covers utility-bar content) */
+  --z-sidebar: 100;      /* Sidebar navigation */
+  --z-sidebar-overlay: 99; /* Sidebar backdrop */
+  --z-header: 200;       /* Main header (above sidebar) */
+  --z-drawer: 1000;      /* Drawers base (stacked: +10 per level via drawer-manager) */
+  --z-modal: 2000;       /* Modals, dialogs (above all drawers) */
+  --z-toast: 2100;       /* Toast notifications (above modals) */
+  --z-tooltip: 2200;     /* Tooltips (topmost) */
+
+  /* High-contrast text for buttons / chips on dark backgrounds */
+  --btn-text-on-dark: #FFFFFF;
+  --btn-text-on-bright: #111111;
+}
+
+/* DARK THEME – default */
+:root[data-theme="dark"] {
+  --bg: #111111;
+  --bg-elevated: #181A1F;
+  --bg-soft: #1F2229;
+
+  --panel: var(--bg-elevated);
+
+  --panel-border: color-mix(in srgb, var(--gray-100) 22%, transparent);
+
+  --text-main: #E7E9EE;
+  --text-muted: #A0A4AF;
+  --text-subtle: #8B8F98;
+  --text-invert: #FFFFFF;
+
+  --text: var(--text-main);
+  --muted: var(--text-muted);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --shadow-sm: var(--shadow-sm-dark);
+  --shadow-md: var(--shadow-md-dark);
+  --shadow-lg: var(--shadow-lg-dark);
+  --shadow-soft:   0 1px 3px  color-mix(in srgb, var(--gray-700) 14%, var(--blue-900) 8%),
+                   0 1px 2px  color-mix(in srgb, var(--gray-700) 18%, var(--blue-900) 6%);
+
+  --shadow-subtle: 0 3px 6px  color-mix(in srgb, var(--gray-700) 12%, var(--blue-900) 10%),
+                   0 1px 4px  color-mix(in srgb, var(--gray-700) 16%, var(--blue-900) 8%);
+  /*
+    Primary uses blue-500:
+    - #3475C0 with white text ≈ 4.72:1 (AA for normal text).
+  */
+  --primary: #3475C0;
+  --primary-soft: rgba(77, 163, 255, 0.1);
+  --primary-hover: #4DA3FF;
+
+  --ok: var(--success);
+
+  --brand: var(--primary);
+
+  /*
+    Cloudflare accent = shared accent-cf.
+    White text passes AA.
+  */
+  --accent-cf-bg: var(--accent-cf);
+  --accent-cf-bg-hover: var(--accent-cf-hover);
+
+  /* Status backgrounds (solid for predictable contrast) */
+  --danger-bg: #3D0915;
+  --success-bg: #042C1C;
+  --warning-bg: #38240A;
+
+  --notice-success-bg: color-mix(in srgb, var(--ok) 22%, var(--bg-soft));
+  --notice-success-fg: color-mix(in srgb, var(--ok) 85%, #ffffff 15%);
+  --notice-error-bg: color-mix(in srgb, var(--danger) 26%, var(--bg-soft));
+  --notice-error-fg: color-mix(in srgb, var(--danger) 86%, #ffffff 12%);
+  --notice-info-bg: color-mix(in srgb, var(--brand) 30%, var(--bg-soft));
+  --notice-info-fg: color-mix(in srgb, var(--brand) 30%, var(--text-main) 70%);
+
+  --input-bg: rgba(15, 16, 22, 0.9);
+  --input-border: var(--border-subtle);
+  --input-border-focus: rgba(77, 163, 255, 0.8);
+
+  --nav-bg: rgba(11, 13, 18, 0.96);
+  --sidebar-bg: #101219;
+}
+
+/* LIGHT THEME */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #FFFFFF;
+  --bg-elevated: #F7F7F8;
+  --bg-soft: #F4F8FC;
+
+  --panel: var(--bg-elevated);
+
+  --panel-border: color-mix(in srgb, var(--gray-900) 18%, transparent);
+
+  --text-main: #111111;
+  --text-muted: #666A73;
+  --text-subtle: #6E7580;
+  --text-invert: #FFFFFF;
+
+  --text: var(--text-main);
+  --muted: var(--text-muted);
+
+  --border-subtle: rgba(15, 23, 42, 0.06);
+  --border-strong: rgba(15, 23, 42, 0.16);
+  --shadow-sm: var(--shadow-sm-light);
+  --shadow-md: var(--shadow-md-light);
+  --shadow-lg: var(--shadow-lg-light);
+
+  /*
+    Primary uses blue-700:
+    - #0055DC with white text ≈ 6.30:1 (AA).
+  */
+  --primary: #0055DC;
+  --primary-soft: rgba(0, 85, 220, 0.08);
+  --primary-hover: #003682; /* even higher contrast */
+
+  --brand: var(--primary);
+
+  /* Semantic overrides — AA 4.5:1 on white */
+  --danger: #D9264A;
+  --success: #0E7B4C;
+  --warning: #9A6200;
+  --info: #2563EB;
+  --ok: var(--success);
+
+  /*
+    Cloudflare accent = same accent-cf to keep brand consistent.
+  */
+  --accent-cf-bg: var(--accent-cf);
+  --accent-cf-bg-hover: var(--accent-cf-hover);
+
+  --danger-bg: #FDE6EA;
+  --success-bg: #E0F7EE;
+  --warning-bg: #FFF1D8;
+
+  --notice-success-bg: color-mix(in srgb, var(--ok) 15%, var(--bg-soft));
+  --notice-success-fg: color-mix(in srgb, var(--ok) 70%, #0f1a0f 30%);
+  --notice-error-bg: color-mix(in srgb, var(--danger) 16%, #FFFFFF);
+  --notice-error-fg: color-mix(in srgb, var(--danger) 72%, #0f0f0f 28%);
+  --notice-info-bg: color-mix(in srgb, var(--brand) 14%, var(--bg-soft));
+  --notice-info-fg: color-mix(in srgb, var(--brand) 68%, #0b182c 32%);
+
+  --input-bg: #FFFFFF;
+  --input-border: var(--border-subtle);
+  --input-border-focus: rgba(0, 85, 220, 0.8);
+
+  --nav-bg: rgba(255, 255, 255, 0.92);
+  --sidebar-bg: #FFFFFF;
+}
+
+/* Глобальные мелочи */
+
+a {
+  color: inherit;
+}
+
+.border {
+  border: var(--border-width) var(--border-style) currentColor;
+  opacity: 0.28;
+}
+
+.border-interactive {
+  border: var(--border-width) var(--border-style) currentColor;
+  opacity: 0.55;
+}
+
+.border-strong {
+  border: var(--border-width) var(--border-style) currentColor;
+  opacity: 0.8;
+}
