@@ -2,6 +2,8 @@
 
 Одноразовая почта в Telegram. `/start` → адрес `*@mailbot.click` (для RU-локали — `*@emailbot.ru`), всё пришедшее прилетает в чат, OTP первой строкой. Адрес живёт сутки. Edge-first, всё на Cloudflare.
 
+**Доки:** [`SPEC.md`](SPEC.md) — финальное тех-задание · [`cloudflare.md`](cloudflare.md) — инфраструктура и деплой.
+
 ## Структура
 
 ```
