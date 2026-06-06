@@ -5,7 +5,7 @@
 Одноразовая почта в Telegram. Юзер жмёт `/start`, получает адрес, всё пришедшее на него прилетает в чат. Пойманный OTP-код выделяется первой строкой. Адрес живёт сутки и протухает сам.
 
 - **Бот:** `@gotemailbot` («Temp Mail — Disposable Email & OTP»)
-- **Домены:** `mailbot.click` (главный, не-RU) · `emailbot.ru` (RU-локаль)
+- **Домены:** старт на одном — **`mailbot.click`**. `emailbot.ru` остаётся на Yandex под русский лендинг (бот туда не вешаем). Мультидомен в коде сохранён — запасные домены приёма добавим позже.
 - **Аккаунты:** git/GitHub — **investblog**; Cloudflare — отдельный аккаунт проекта (Account ID `d36a36…`), доступ через выделенный API-токен. Детали — `cloudflare.md`.
 - **Принцип:** edge-first, zero-backend. Всё живёт на Cloudflare. Письма на MVP не хранятся — улетают в чат юзера и лежат там.
 - **Архитектура:** **Telegram-бот — первый клиент поверх email-core**, а не «весь сервис = Telegram». Ядро (приём/адреса/OTP/доставка) привязано к абстракции **owner**, не к `chat_id`. Это мост к будущему browser extension без переписывания ядра (см. §13).
@@ -73,7 +73,7 @@ clients:                       telegram bot (bot.js)  ·  future browser extensi
 
 **Owner-oriented.** Адресами владеет `owner` (тип задаётся `kind`). Telegram — первый клиент (`kind='telegram'`, `external_id=chat_id`, `id='tg:<chat_id>'`). `box.owner_id` ссылается на `owners.id`.
 
-**Ключ адреса составной** `(localpart, domain)` — из-за мультидомена: `x7k2p9a1@mailbot.click` и `x7k2p9a1@emailbot.ru` — разные адреса.
+**Ключ адреса составной** `(localpart, domain)` — из-за мультидомена: `x7k2p9a1@mailbot.click` и `x7k2p9a1@<backup-домен>` — разные адреса (на старте домен один, но ключ заложен под несколько).
 
 ```sql
 CREATE TABLE owners (
@@ -92,7 +92,7 @@ CREATE TABLE owners (
 
 CREATE TABLE boxes (
   localpart   TEXT NOT NULL,        -- x7k2p9a1
-  domain      TEXT NOT NULL,        -- mailbot.click | emailbot.ru
+  domain      TEXT NOT NULL,        -- mailbot.click (+ запасные позже)
   owner_id    TEXT NOT NULL,        -- → owners.id
   created_at  INTEGER NOT NULL,
   expires_at  INTEGER NOT NULL,     -- now + 24h; продление двигает вперёд
@@ -208,7 +208,7 @@ Vars (с дефолтами, переопределяются на деплое)
 
 | Var | Дефолт | Смысл |
 |---|---|---|
-| `DOMAINS` | `mailbot.click,emailbot.ru` | домены приёма; первый не-`.ru` = главный |
+| `DOMAINS` | `mailbot.click` | домены приёма (старт — один); первый не-`.ru` = главный |
 | `BOX_TTL_HOURS` | `24` | время жизни адреса |
 | `MAX_ACTIVE_BOXES` | `2` | лимит активных адресов на юзера |
 | `RL_PER_HOUR` | `30` | rate-limit писем на адрес в час |
@@ -227,7 +227,7 @@ Vars (с дефолтами, переопределяются на деплое)
 
 - **Email Routing** — только приём, отправка закрыта (нам не нужна).
 - **ToS Email Routing** — фича под «свой домен»; публичный приём чужой почты в серой зоне. При потоке abuse-репортов CF может отключить routing на зоне. **Риск принят осознанно**; митигация — план Б (`/ingest` + внешний MX, напр. Yandex 360 / postfix).
-- **`.ru` + ПДн** — публичный приём чужой почты на `.ru` = расширенная поверхность. На MVP «ничего не храним» — это и есть отличие от классических temp-mail. Фаза 2 (хранение) требует отдельной юридической проработки.
+- **`.ru` + ПДн** — на старте НЕ актуально: приём идёт только на `mailbot.click`, `emailbot.ru` под лендинг (почту не принимает). Риск всплывёт, только если позже добавим `.ru`-домен в приём — тогда публичный приём чужой почты на `.ru` = расширенная поверхность (ПДн, особенно при хранении в фазе 2), требует отдельной юр-проработки.
 - **Размер письма** — Email Routing допускает до 25 MiB, но на Free парс такого MIME может упереться в CPU/memory ([Email Routing limits](https://developers.cloudflare.com/email-routing/limits/)). Митигация: отбой по `MAX_RAW_KB` ДО парса (см. §8). **IP reputation** — shared inbound CF иногда отдаёт `451`.
 - **Workers subrequests (Free).** Сабреквест = любой `fetch()` ИЛИ обращение к CF-сервису (D1/KV/R2). Лимит **50 на вызов считает все типы вместе**; дополнительно отдельный потолок **1000** на обращения к внутренним сервисам CF. Наш расход на письмо — единицы (несколько D1/KV + 1–2 `fetch` в Telegram), запас большой. Источники: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [changelog 2026-02-11 (external / Cloudflare-service subrequests)](https://developers.cloudflare.com/changelog/post/2026-02-11-subrequests-limit/).
 

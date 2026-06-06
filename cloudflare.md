@@ -9,9 +9,9 @@
 | CF-аккаунт | отдельный аккаунт проекта; доступ wrangler — через выделенный API-токен (`CLOUDFLARE_API_TOKEN`), не через интерактивный логин |
 | Account ID | `d36a36cd1d5b17048d3b20a4c32aa7c7` (не секрет; прописан в `wrangler.jsonc`) |
 | Git/GitHub | **investblog** (отдельно от CF) |
-| Главный домен (не-RU) | `mailbot.click` |
-| RU-домен | `emailbot.ru` |
-| Worker | `gotemailbot` |
+| Домен приёма (старт) | `mailbot.click` (Email Routing → worker) |
+| `emailbot.ru` | на **Yandex** под русский лендинг; почту бота НЕ принимает, MX не трогаем |
+| Worker | `gotemailbot` → `https://gotemailbot.gotemailbot.workers.dev` (workers.dev subdomain `gotemailbot`) |
 | Бот | `@gotemailbot` |
 
 ## Ресурсы и биндинги
@@ -37,7 +37,7 @@
 - Account Settings — **Read** (whoami)
 - Workers Tail — Read *(опц., для `wrangler tail`)*
 
-**Zone-level** (зоны `mailbot.click`, `emailbot.ru`):
+**Zone-level** (только зона приёма `mailbot.click`; `emailbot.ru` не трогаем):
 - Email Routing Rules — **Edit**
 - DNS — **Edit** (включение Routing пишет MX/TXT)
 - Zone — **Read**

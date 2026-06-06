@@ -6,10 +6,10 @@
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  // Домены приёма. RU-локаль → .ru, остальные → нейтральный домен.
-  // ВРЕМЕННО только mailbot.click: на emailbot.ru уже стоит Yandex MX, Email Routing
-  // там не включён (снос чужих MX = решение владельца). Вернуть "mailbot.click,emailbot.ru"
-  // после настройки приёма на emailbot.ru. resolve в email() принимает любой из списка.
+  // Домены приёма бота. Старт — один домен mailbot.click.
+  // emailbot.ru НЕ здесь: он остаётся на Yandex под русский лендинг (бот туда не вешаем).
+  // Мультидомен в коде сохранён (resolve/pickDomain): запасные домены приёма добавим позже,
+  // тогда список станет, напр., "mailbot.click,<backup>". RU-локаль → первый .ru, иначе первый не-.ru.
   "vars": {
     "DOMAINS": "mailbot.click",
     "PROMO_BASE": "https://301.st/",

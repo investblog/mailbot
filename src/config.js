@@ -1,7 +1,7 @@
 // Конфиг, выводимый из env. Всё с дефолтами — Worker поднимается даже с пустыми vars.
 
 export function config(env) {
-  const domains = (env.DOMAINS || 'mailbot.click,emailbot.ru')
+  const domains = (env.DOMAINS || 'mailbot.click')
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   return {
     domains,

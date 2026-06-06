@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS owners (
 -- Адрес = (localpart, domain): мультидомен, поэтому ключ составной.
 CREATE TABLE IF NOT EXISTS boxes (
   localpart   TEXT NOT NULL,        -- x7k2p9a1 (алфавит без 0/o/1/l/i)
-  domain      TEXT NOT NULL,        -- mailbot.click | emailbot.ru
+  domain      TEXT NOT NULL,        -- mailbot.click (+ запасные домены позже)
   owner_id    TEXT NOT NULL,        -- → owners.id
   created_at  INTEGER NOT NULL,
   expires_at  INTEGER NOT NULL,     -- now + TTL; продление двигает вперёд
