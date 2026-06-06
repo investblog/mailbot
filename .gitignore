@@ -1,5 +1,38 @@
+# --- deps / build ---
 node_modules/
-.wrangler/
-.dev.vars
 dist/
 *.log
+
+# --- Cloudflare / wrangler ---
+.wrangler/
+# секреты wrangler в dev — НИКОГДА в публичный репо
+.dev.vars
+.dev.vars.*
+
+# --- секреты / окружение ---
+.env
+.env.*
+*.local
+*.pem
+*.key
+secrets.*
+
+# --- Claude / AI-ассистенты (локальный контекст, не для публики) ---
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.cursor/
+.cursorrules
+.aider*
+.mcp.json
+
+# --- редакторы / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- ОС ---
+.DS_Store
+Thumbs.db
+desktop.ini
