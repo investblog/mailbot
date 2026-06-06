@@ -2,13 +2,14 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "gotemailbot",
   "main": "src/index.js",
+  "account_id": "d36a36cd1d5b17048d3b20a4c32aa7c7",
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
 
   // Домены приёма. RU-локаль → .ru, остальные → нейтральный домен.
   // Можно переопределить на деплое; resolve в email() принимает любой из списка.
   "vars": {
-    "DOMAINS": "emailbot.ru,emailbot.io",
+    "DOMAINS": "mailbot.click,emailbot.ru",
     "PROMO_BASE": "https://301.st/",
     "BOX_TTL_HOURS": "24",
     "MAX_ACTIVE_BOXES": "2",
