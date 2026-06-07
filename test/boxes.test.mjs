@@ -65,13 +65,28 @@ test('enforceActiveLimit сносит самые старые сверх лим�
   assert.equal(left[0].localpart, 'c');
 });
 
-test('extendBox двигает expires_at вперёд', async () => {
+test('extendBox двигает expires_at вперёд (owner-scoped)', async () => {
   const env = makeEnv();
   await ensureOwner(env, 'telegram', 1);
   await insertBox(env, 'x', 'mailbot.click', 'tg:1', 1, 1); // протух
-  const exp = await extendBox(env, 'x', 'mailbot.click', 24);
+  const exp = await extendBox(env, 'tg:1', 'x', 'mailbot.click', 24);
   assert.ok(exp > Math.floor(Date.now() / 1000));
   assert.ok((await resolveBox(env, 'x', 'mailbot.click')) !== null);
+});
+
+test('extendBox/deleteBox чужой адрес не трогают (ownership в SQL)', async () => {
+  const env = makeEnv();
+  await ensureOwner(env, 'telegram', 1);
+  await ensureOwner(env, 'telegram', 2);
+  await insertBox(env, 'mine', 'mailbot.click', 'tg:1', 1);
+  // tg:2 пытается продлить/удалить чужой адрес
+  assert.equal(await extendBox(env, 'tg:2', 'mine', 'mailbot.click', 24), null);
+  const { deleteBox } = await import('../src/boxes.js');
+  assert.equal(await deleteBox(env, 'tg:2', 'mine', 'mailbot.click'), false);
+  assert.ok((await resolveBox(env, 'mine', 'mailbot.click')) !== null); // адрес жив
+  // владелец удаляет свой
+  assert.equal(await deleteBox(env, 'tg:1', 'mine', 'mailbot.click'), true);
+  assert.equal(await resolveBox(env, 'mine', 'mailbot.click'), null);
 });
 
 test('deleteBoxesForOwner сносит все адреса владельца', async () => {

@@ -552,6 +552,10 @@ img, svg { display: block; }
   background: var(--bg-soft);
 }
 
+/* CTA-кнопка в мобильном меню: белый текст на синем (перебиваем muted-цвет ссылок меню). */
+.nav__mobile-menu a.btn { color: var(--btn-text-on-dark); }
+.nav__mobile-menu a.btn:hover { color: var(--btn-text-on-dark); background: var(--tg-hover); }
+
 /* =========================
    HERO
    ========================= */

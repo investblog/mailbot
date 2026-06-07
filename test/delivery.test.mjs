@@ -6,6 +6,7 @@ import { makeEnv } from './helpers/d1.mjs';
 import { ensureOwner } from '../src/owners.js';
 import { createBox, activeBoxes } from '../src/boxes.js';
 import { deliver } from '../src/delivery.js';
+import { listMessages } from '../src/messages.js';
 
 const owner = { id: 'tg:1', kind: 'telegram', external_id: '1' };
 const msg = { from: 'a@b.c', subject: 's', body: 'b', links: [], attachments: [], otp: null };
@@ -71,4 +72,21 @@ test('429 после ретраев → transient', async () => {
   restore();
   assert.equal(r.delivered, false);
   assert.equal(r.permanent, false);
+});
+
+test('extension: сохраняет нормализованное письмо в messages', async () => {
+  const env = makeEnv();
+  await ensureOwner(env, 'extension', 'devhash');
+  const extOwner = { id: 'ext:devhash', kind: 'extension', external_id: 'devhash' };
+  const extMsg = {
+    from: 's@x.y', subject: 'Code', plain: 'your code 284913',
+    bodyTokens: [{ type: 'text', value: 'your code 284913' }], links: [], attachments: [],
+    otp: '284913', box: { localpart: 'lp', domain: 'mailbot.click', expires_at: 9_999_999_999 },
+  };
+  const r = await deliver(env, ctxCollect().ctx, extOwner, extMsg);
+  assert.deepEqual(r, { delivered: true });
+  const { messages } = await listMessages(env, 'ext:devhash', '');
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].otp, '284913');
+  assert.equal(messages[0].address, 'lp@mailbot.click');
 });
