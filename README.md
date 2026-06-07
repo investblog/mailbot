@@ -90,4 +90,4 @@ On MVP, emails are **not stored** — they are parsed at Cloudflare's edge and d
 
 ---
 
-Built by [investblog](https://github.com/investblog) with [Claude](https://claude.ai)
+Built by [301.st](https://301.st) with [Claude](https://claude.ai)
