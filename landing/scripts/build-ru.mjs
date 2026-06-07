@@ -110,6 +110,19 @@ function applyDataI18nAria(html, strings) {
   );
 }
 
+function applyDataI18nHref(html, strings) {
+  return html.replace(
+    /<([^>]*)\bdata-i18n-href="([^"]+)"([^>]*)>/g,
+    (match, before, key, after) => {
+      const val = strings[key] ? interpolate(strings[key]) : null;
+      if (!val) return match;
+      const full = `${before}data-i18n-href="${key}"${after}`;
+      const updated = full.replace(/href="[^"]*"/, `href="${escapeHtml(val)}"`);
+      return `<${updated}>`;
+    }
+  );
+}
+
 function applyMeta(html, strings, titleKey, descKey, pathSuffix) {
   const title = strings[titleKey] ? interpolate(strings[titleKey]) : null;
   const desc = strings[descKey] ? interpolate(strings[descKey]) : null;
@@ -256,6 +269,7 @@ function build() {
     html = applyDataI18nHtml(html, strings);
     html = applyDataI18nPlaceholder(html, strings);
     html = applyDataI18nAria(html, strings);
+    html = applyDataI18nHref(html, strings);
     html = applyMeta(html, strings, titleKey, descKey, outputSubdir);
     html = addHeadTags(html, outputSubdir);
 

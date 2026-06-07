@@ -73,6 +73,13 @@ export function applyTranslations(): void {
     if (val !== key) el.setAttribute('aria-label', val);
   });
 
+  // Локале-зависимый href (напр. спонсор: 301.st для en / 301.ru для ru)
+  document.querySelectorAll<HTMLAnchorElement>('[data-i18n-href]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-href')!;
+    const val = t(key);
+    if (val !== key) el.setAttribute('href', val);
+  });
+
   // Locale-specific internal links (/path → /ru/path)
   document.querySelectorAll<HTMLAnchorElement>('[data-locale-link]').forEach((el) => {
     const path = el.getAttribute('data-locale-link')!;

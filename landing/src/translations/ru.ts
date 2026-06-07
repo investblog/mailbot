@@ -63,6 +63,8 @@ const ru: TranslationMap = {
 
   'footer.copy': '© {year} MailBot',
   'footer.telegram': 'Бот в Telegram',
+  'footer.sponsor': 'Спонсор — 301',
+  'footer.sponsor_url': 'https://301.ru',
 };
 
 export default ru;
