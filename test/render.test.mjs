@@ -54,7 +54,7 @@ test('обрезка тела из <&> не рвёт HTML entity (нет malform
   assert.ok(!/<(?!b>|\/b>|code>|\/code>)/.test(out), 'найдена сырая <');
 });
 
-test('пустое тело даёт плейсхолдер', () => {
-  const out = renderEmail({ from: 'a@b', subject: 's', body: '', links: [], attachments: [] });
-  assert.match(out, /пустое тело/);
+test('пустое тело даёт плейсхолдер (локализованный)', () => {
+  assert.match(renderEmail({ from: 'a@b', subject: 's', body: '', lang: 'ru' }), /пустое тело/);
+  assert.match(renderEmail({ from: 'a@b', subject: 's', body: '', lang: 'en' }), /empty body/);
 });

@@ -3,6 +3,7 @@
 
 import { now } from './config.js';
 import { sendMessage } from './telegram.js';
+import { strings, fmt } from './strings.js';
 
 const PROMO_COOLDOWN = 30 * 24 * 3600; // не чаще раза в 30 дней
 
@@ -22,11 +23,7 @@ export async function maybePromo(env, cfg, owner, row) {
   // encodeURIComponent: owner.id может содержать символы будущих клиентов, не тащим в query сырьём.
   const cid = encodeURIComponent(owner.id);
   const url = `${cfg.promoBase}?utm_source=gotemailbot&utm_campaign=otp_heavy&cid=${cid}`;
-  const res = await sendMessage(
-    env,
-    owner.external_id,
-    'Гоняешь OTP пачками — похоже, ты вебмастер.\n' +
-      `301.st: клоак/TDS под арбитражный трафик.\n${url}`
-  );
+  const s = strings(row.locale || owner.locale);
+  const res = await sendMessage(env, owner.external_id, fmt(s.promo, { url }));
   return res.ok;
 }

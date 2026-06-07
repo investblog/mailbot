@@ -2,6 +2,8 @@
 // чтобы длинный subject / много ссылок / вложений не дали 400 (после которого письмо дропается).
 // HTML-теги ставим только сами (otp + <b>subject</b>); всё пользовательское — escape'им.
 
+import { strings } from './strings.js';
+
 export const TG_MSG_LIMIT = 4000; // < 4096, запас на эмодзи/служебку
 const SUBJECT_MAX = 200;
 const FROM_MAX = 120;
@@ -61,17 +63,18 @@ function renderBody(tokens, budget) {
   return out;
 }
 
-export function renderEmail({ from, subject, bodyTokens, body, links, otp, attachments }) {
+export function renderEmail({ from, subject, bodyTokens, body, links, otp, attachments, lang }) {
+  const s = strings(lang);
   // Заголовок (с тегами) — сохраняем целиком, поэтому каждое поле ограничено по escaped-длине.
   const head = [];
   if (otp) head.push(`🔑 <b>${escClip(otp, OTP_MAX)}</b>  <code>${escClip(otp, OTP_MAX)}</code>`);
-  head.push(`<b>${escClip(subject || '(без темы)', SUBJECT_MAX)}</b>`);
-  head.push(`от: ${escClip(from || '', FROM_MAX)}`);
+  head.push(`<b>${escClip(subject || s.noSubject, SUBJECT_MAX)}</b>`);
+  head.push(`${s.from} ${escClip(from || '', FROM_MAX)}`);
 
   // Подвал: ссылки + вложения, ограничены по числу и escaped-длине.
   const foot = [];
   const ls = (links || []).slice(0, LINKS_MAX).map((l) => escClip(l, LINK_MAX));
-  if (ls.length) foot.push('', '🔗 ссылки:', ...ls);
+  if (ls.length) foot.push('', s.links, ...ls);
   const as = (attachments || []).slice(0, ATTACH_MAX);
   if (as.length) {
     foot.push('');
@@ -88,8 +91,8 @@ export function renderEmail({ from, subject, bodyTokens, body, links, otp, attac
   // bodyTokens — основной путь; body-строка оставлена для обратной совместимости/тестов.
   const tokens = bodyTokens && bodyTokens.length
     ? bodyTokens
-    : [{ type: 'text', value: body || '(пустое тело)' }];
-  const bodyStr = renderBody(tokens, budget) || escClip('(пустое тело)', budget);
+    : [{ type: 'text', value: body || s.emptyBody }];
+  const bodyStr = renderBody(tokens, budget) || escClip(s.emptyBody, budget);
 
   let out = `${headStr}\n\n${bodyStr}`;
   if (footStr) out += `\n${footStr}`;

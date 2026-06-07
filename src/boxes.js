@@ -42,7 +42,7 @@ export async function createBox(env, ownerId, domain, ttlHours) {
 // JOIN, чтобы один round-trip отдавал и идентичность владельца (kind/external_id) для доставки.
 export async function resolveBox(env, localpart, domain) {
   const row = await env.DB.prepare(
-    `SELECT b.owner_id, b.expires_at, o.kind, o.external_id
+    `SELECT b.owner_id, b.expires_at, o.kind, o.external_id, o.locale
      FROM boxes b JOIN owners o ON o.id = b.owner_id
      WHERE b.localpart = ? AND b.domain = ?`
   ).bind(localpart, domain).first();
@@ -50,7 +50,7 @@ export async function resolveBox(env, localpart, domain) {
   if (row.expires_at <= now()) return null; // логически протух
   return {
     expires_at: row.expires_at,
-    owner: { id: row.owner_id, kind: row.kind, external_id: row.external_id },
+    owner: { id: row.owner_id, kind: row.kind, external_id: row.external_id, locale: row.locale },
   };
 }
 

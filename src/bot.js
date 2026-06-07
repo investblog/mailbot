@@ -1,24 +1,25 @@
 // Клиент: Telegram-бот поверх email-core. Команды /start /new /help + кнопки.
-// Маппит Telegram chat_id → owner(kind='telegram'); вся логика адресов — в core.
+// Маппит Telegram chat_id → owner(kind='telegram'); язык UI — по locale (language_code).
 
 import { config, pickDomain } from './config.js';
 import { createBox, activeBoxes, enforceActiveLimit, extendBox } from './boxes.js';
 import { upsertOwner, ensureOwner, incOwner } from './owners.js';
 import { sendMessage, answerCallback, keyboard, esc } from './telegram.js';
 import { newBoxLimited } from './ratelimit.js';
+import { strings, fmt } from './strings.js';
 
 const KIND = 'telegram';
 
-const KB = keyboard([
-  [{ text: 'Новый адрес', callback_data: 'new' }, { text: 'Продлить', callback_data: 'extend' }],
-  [{ text: 'Помощь', callback_data: 'help' }],
-]);
+function kb(s) {
+  return keyboard([
+    [{ text: s.btnNew, callback_data: 'new' }, { text: s.btnExtend, callback_data: 'extend' }],
+    [{ text: s.btnHelp, callback_data: 'help' }],
+  ]);
+}
 
-const RL_MSG = 'Слишком часто. Лимит новых адресов исчерпан — попробуй позже.';
-
-function fmtAddress(address, expiresAt) {
+function fmtAddress(s, address, expiresAt) {
   const hours = Math.max(0, Math.round((expiresAt - Date.now() / 1000) / 3600));
-  return `Адрес: <code>${esc(address)}</code>\nЖивёт ~${hours} ч. Всё, что придёт, прилетит сюда.`;
+  return fmt(s.address, { addr: esc(address), h: hours });
 }
 
 // Создаёт адрес для владельца. null если упёрлись в rate-limit на /new.
@@ -42,29 +43,30 @@ async function handleMessage(msg, env, cfg) {
   if (!chatId) return;
   const text = (msg.text || '').trim();
   const locale = msg.from?.language_code;
+  const s = strings(locale);
 
   if (text.startsWith('/start')) {
     const owner = await upsertOwner(env, KIND, chatId, locale); // /start = заход, +session
     const active = await activeBoxes(env, owner.id);
     if (active.length) {
       const b = active[0];
-      return sendMessage(env, chatId, fmtAddress(`${b.localpart}@${b.domain}`, b.expires_at), KB);
+      return sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, b.expires_at), kb(s));
     }
     const box = await newAddress(env, cfg, owner, locale);
-    if (!box) return sendMessage(env, chatId, RL_MSG, KB);
-    return sendMessage(env, chatId, fmtAddress(box.address, box.expires_at), KB);
+    if (!box) return sendMessage(env, chatId, s.rlMsg, kb(s));
+    return sendMessage(env, chatId, fmtAddress(s, box.address, box.expires_at), kb(s));
   }
 
   if (text.startsWith('/new')) {
     const owner = await ensureOwner(env, KIND, chatId, locale); // без +session
     const box = await newAddress(env, cfg, owner, locale);
-    if (!box) return sendMessage(env, chatId, RL_MSG, KB);
-    return sendMessage(env, chatId, fmtAddress(box.address, box.expires_at), KB);
+    if (!box) return sendMessage(env, chatId, s.rlMsg, kb(s));
+    return sendMessage(env, chatId, fmtAddress(s, box.address, box.expires_at), kb(s));
   }
 
-  if (text.startsWith('/help')) return sendHelp(env, chatId);
+  if (text.startsWith('/help')) return sendMessage(env, chatId, s.help, kb(s));
 
-  return sendMessage(env, chatId, 'Команды: /start · /new · /help', KB);
+  return sendMessage(env, chatId, s.cmds, kb(s));
 }
 
 async function handleCallback(cq, env, cfg) {
@@ -72,46 +74,36 @@ async function handleCallback(cq, env, cfg) {
   const data = cq.data;
   if (!chatId) return answerCallback(env, cq.id);
   const locale = cq.from?.language_code;
+  const s = strings(locale);
 
   if (data === 'new') {
     const owner = await ensureOwner(env, KIND, chatId, locale);
     const box = await newAddress(env, cfg, owner, locale);
     if (!box) {
-      await sendMessage(env, chatId, RL_MSG, KB);
-      return answerCallback(env, cq.id, 'Лимит');
+      await sendMessage(env, chatId, s.rlMsg, kb(s));
+      return answerCallback(env, cq.id, s.limit);
     }
-    await sendMessage(env, chatId, fmtAddress(box.address, box.expires_at), KB);
-    return answerCallback(env, cq.id, 'Готово');
+    await sendMessage(env, chatId, fmtAddress(s, box.address, box.expires_at), kb(s));
+    return answerCallback(env, cq.id, s.okNew);
   }
 
   if (data === 'extend') {
     const owner = await ensureOwner(env, KIND, chatId, locale);
     const active = await activeBoxes(env, owner.id);
     if (!active.length) {
-      await sendMessage(env, chatId, 'Активных адресов нет. /new — создать.', KB);
+      await sendMessage(env, chatId, s.noActive, kb(s));
       return answerCallback(env, cq.id);
     }
     const b = active[0];
     const exp = await extendBox(env, b.localpart, b.domain, cfg.ttlHours);
-    await sendMessage(env, chatId, fmtAddress(`${b.localpart}@${b.domain}`, exp), KB);
-    return answerCallback(env, cq.id, 'Продлено');
+    await sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, exp), kb(s));
+    return answerCallback(env, cq.id, s.okExtend);
   }
 
   if (data === 'help') {
-    await sendHelp(env, chatId);
+    await sendMessage(env, chatId, s.help, kb(s));
     return answerCallback(env, cq.id);
   }
 
   return answerCallback(env, cq.id);
-}
-
-function sendHelp(env, chatId) {
-  return sendMessage(
-    env, chatId,
-    'Одноразовая почта. /new даёт адрес — всё, что на него придёт, прилетит в этот чат, ' +
-      'OTP-код выделяется первой строкой.\n\n' +
-      'Адрес живёт сутки и протухает сам. Письма нигде не хранятся — только здесь, в чате.\n' +
-      'Не для важной почты: адрес временный, при протухании письма на него отбиваются.',
-    KB
-  );
 }

@@ -34,8 +34,8 @@ export async function ingest(env, cfg, ctx, owner, raw, from) {
   const otp = extractOtp(subject, norm.plain);
   const attachments = (parsed.attachments || []).map((a) => a.filename || 'файл');
 
-  // Нормализованное сообщение — без знания о клиенте.
-  const msg = { from, subject, bodyTokens: norm.tokens, links, otp, attachments };
+  // Нормализованное сообщение — без знания о клиенте. lang — по локали владельца.
+  const msg = { from, subject, bodyTokens: norm.tokens, links, otp, attachments, lang: owner.locale };
   const outcome = await deliver(env, ctx, owner, msg);
 
   // Телеметрия + промо — только при успешной доставке, вне горячего пути.
