@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./popup.css" />
+</head>
+<body>
+  <header class="hd">
+    <img class="logo" src="/icon/48.png" alt="" />
+    <div class="ttl">
+      <b data-i18n="title">MailBot</b>
+      <span class="sub" data-i18n="tagline"></span>
+    </div>
+  </header>
+
+  <section class="addr-card">
+    <div class="addr-row">
+      <code id="addr">…</code>
+      <button id="copy-addr" class="icon-btn" title="Copy">⧉</button>
+    </div>
+    <div class="addr-meta" id="addr-meta"></div>
+    <div class="addr-actions">
+      <button id="new" class="btn btn-tg" data-i18n="new"></button>
+      <button id="extend" class="btn" data-i18n="extend"></button>
+      <button id="delete" class="btn btn-ghost" data-i18n="delete"></button>
+    </div>
+  </section>
+
+  <section class="inbox">
+    <h2 data-i18n="inbox"></h2>
+    <div id="list" class="list"></div>
+  </section>
+
+  <footer class="ft">
+    <a href="https://t.me/gotemailbot" target="_blank" rel="noopener" data-i18n="open_tg"></a>
+    <a href="https://github.com/investblog/mailbot" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

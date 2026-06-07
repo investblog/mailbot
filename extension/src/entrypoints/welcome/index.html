@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MailBot</title>
+  <style>
+    :root { --primary:#fe4622; --tg:#355ff5; --bg:#fff; --text:#16181d; --muted:#6b7280; font-family: system-ui,-apple-system,"Segoe UI",sans-serif; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#111317; --text:#f3f5f8; --muted:#9aa3b2; } }
+    body { background:var(--bg); color:var(--text); margin:0; display:flex; min-height:100vh; align-items:center; justify-content:center; padding:24px; }
+    .card { max-width:520px; text-align:center; }
+    img { width:72px; height:72px; }
+    h1 { margin:14px 0 4px; }
+    p.lead { color:var(--muted); font-size:17px; margin:0 0 22px; }
+    ol { text-align:left; display:inline-block; line-height:1.9; font-size:15px; }
+    .cta { display:inline-flex; gap:8px; align-items:center; margin-top:18px; background:var(--tg); color:#fff; text-decoration:none; padding:11px 18px; border-radius:999px; font-weight:600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/icon/128.png" alt="" />
+    <h1>MailBot</h1>
+    <p class="lead" data-i18n="welcome.lead">Disposable email with OTP, right in your browser.</p>
+    <ol>
+      <li data-i18n="welcome.s1">Click the MailBot icon to get a disposable address.</li>
+      <li data-i18n="welcome.s2">Paste it into any signup or login form.</li>
+      <li data-i18n="welcome.s3">The email — and the OTP code — appear in the popup.</li>
+    </ol>
+    <div>
+      <a class="cta" href="https://t.me/gotemailbot" target="_blank" rel="noopener" data-i18n="welcome.tg">Also available in Telegram</a>
+    </div>
+  </div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
