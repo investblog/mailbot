@@ -23,7 +23,7 @@ export default defineConfig({
 
     permissions: ['storage', 'alarms', 'notifications'],
     // Доступ только к нашему API (CORS на сервере = *). Никаких *://*/*.
-    host_permissions: ['https://gotemailbot.gotemailbot.workers.dev/*'],
+    host_permissions: ['https://api.mailbot.click/*'],
 
     icons: {
       16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png', 128: 'icon/128.png', 256: 'icon/256.png',

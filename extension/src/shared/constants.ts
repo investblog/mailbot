@@ -1,5 +1,5 @@
-// Конфиг расширения. API на workers.dev (CORS=* на сервере). Кастом-домен api.mailbot.click — позже.
-export const API_BASE = 'https://gotemailbot.gotemailbot.workers.dev';
+// Конфиг расширения. API на кастом-домене воркера (CORS=* на сервере).
+export const API_BASE = 'https://api.mailbot.click';
 export const BOT_URL = 'https://t.me/gotemailbot';
 
 export const POLL_OPEN_MS = 2500; // частый поллинг пока popup открыт (ожидание кода)

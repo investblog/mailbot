@@ -12,6 +12,7 @@
 | Домен приёма (старт) | `mailbot.click` (Email Routing → worker) |
 | `emailbot.ru` | на **Yandex** под русский лендинг; почту бота НЕ принимает, MX не трогаем |
 | Worker | `gotemailbot` → `https://gotemailbot.gotemailbot.workers.dev` (workers.dev subdomain `gotemailbot`) |
+| `api.mailbot.click` | Custom Domain воркера `gotemailbot` (для `/api/*` расширения; CORS=*) |
 | Бот | `@gotemailbot` |
 
 ## Ресурсы и биндинги

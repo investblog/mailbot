@@ -18,7 +18,8 @@
 ## Архитектурные решения (зафиксированы владельцем)
 - Доставка — **polling** (открыт popup: 2.5с; фон: alarm 1 мин + нотификации). Web Push — фаза 2.
 - Auth — **анонимный device-token** (без регистрации). Bearer = 32B base64url; сервер хранит только sha256-хеш.
-- Хранение — на сервере (D1, текст, TTL 24ч). Браузеры — Chrome/Edge/Firefox (Opera пропущен).
+- Хранение — на сервере (D1, текст, TTL 24ч). Браузеры — Chrome/Edge/Firefox/Opera (WXT, единый `browser` API).
+- API — на кастом-домене воркера **`api.mailbot.click`** (Custom Domain, CORS=*).
 
 ## Проверка на утро (ручная — нужен живой браузер)
 1. `cd extension && npm install` (если ещё не) → `npm run dev` (Chrome) — WXT откроет браузер с загруженным расширением.
@@ -30,8 +31,8 @@
 5. Firefox: `npm run build:firefox` → `about:debugging` → «Загрузить временное дополнение» → `dist/firefox-mv2/manifest.json`.
 
 ## Известные ограничения / TODO (обсудить утром)
-- API на `gotemailbot.gotemailbot.workers.dev` (host_permissions). Чище — завести `api.mailbot.click` (Worker route) и заменить.
-- Иконки — из лого-маскота (если sharp не поставился — дефолтные; заменить).
+- API на `api.mailbot.click` (Custom Domain воркера) — готово.
+- Иконки — из лого-маскота (та же, что в лендинге).
 - Юнит-тесты расширения не подключены (node strip-types + extensionless-импорты хрупки); верификация = tsc + wxt build + eslint.
   Логика escape/render зеркалит уже протестированный `src/render.js` бэкенда.
 - Автозаполнение OTP в активное поле (content-script), аккаунт поверх device-token, rewarded — фаза 3.
