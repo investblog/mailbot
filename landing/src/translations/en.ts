@@ -63,6 +63,7 @@ const en: TranslationMap = {
 
   'footer.copy': '© {year} MailBot',
   'footer.telegram': 'Telegram bot',
+  'footer.source': 'Source',
   'footer.sponsor': 'Sponsored by 301',
   'footer.sponsor_url': 'https://301.st',
 };
