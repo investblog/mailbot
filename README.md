@@ -1,72 +1,93 @@
-# gotemailbot
+# MailBot
 
-Одноразовая почта в Telegram. `/start` → адрес `*@mailbot.click`, всё пришедшее прилетает в чат, OTP первой строкой. Адрес живёт сутки. Edge-first, всё на Cloudflare. (Мультидомен в коде есть; старт на одном домене.)
+Disposable email, inside Telegram. Press `/start`, get an address, paste it anywhere — every message lands in your chat with the **OTP code on the first line**. Addresses live 24h and expire on their own. Edge-first, nothing stored.
 
-**Доки:** [`SPEC.md`](SPEC.md) — финальное тех-задание · [`cloudflare.md`](cloudflare.md) — инфраструктура и деплой.
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Telegram](https://img.shields.io/badge/Telegram-%40gotemailbot-2CA5E0?logo=telegram&logoColor=white)](https://t.me/gotemailbot)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 
-## Структура
+**Try it:** [@gotemailbot](https://t.me/gotemailbot) · [mailbot.click](https://mailbot.click) (EN) · [emailbot.ru](https://emailbot.ru) (RU)
+
+## Features
+
+- **OTP on the first line** — smart scoring extracts the verification code and puts it first; tap to copy
+- **24-hour addresses** — each address expires on its own; create a new one anytime
+- **Nothing stored** — mail is parsed at the edge and forwarded to your chat, not kept on our side
+- **Email normalization** — strips forwarded headers, invisible junk, logo links; renders `Label <url>` as clickable Telegram links
+- **Bilingual** — RU/EN by Telegram locale (UI + email labels)
+- **Abuse protection** — per-address and per-user rate limits, sender denylist, size guard
+- **Edge-first** — runs entirely on Cloudflare (Email Routing + Workers + D1 + KV), no backend
+
+## How it works
 
 ```
-src/  (email-core — client-agnostic)
-  index.js     маршрутизатор входов: email() / fetch() / scheduled()
-  ingest.js    конвейер письма: parse → нормализация → deliver()
-  boxes.js     адреса (генерация/коллизии/лимиты), привязка к owner_id
-  owners.js    владельцы (upsert/ensure) + телеметрия
-  otp.js       скоринговый OTP-экстрактор (порог >= 4)
-  html.js      HTML→текст через HTMLRewriter
-  ratelimit.js общие abuse-проверки (denylist, rate-limit на адрес и /new)
-  config.js    конфиг из env, выбор домена по локали
-src/  (delivery seam)
-  delivery.js  deliver(owner, msg) — диспатч по owner.kind
-src/  (clients)
-  bot.js       Telegram: /start /new /help + кнопки
-  telegram.js  TG Bot API + escape + ретрай транзиента
-  render.js    сборка TG-сообщения с контролем итоговой длины
-  promo.js     кросс-промо 301.st
-test/          otp / ratelimit / render / boxes / delivery
-  helpers/d1.mjs  D1-шим над node:sqlite
-scripts/
-  preflight.mjs deploy guard (npm run preflight)
-schema.sql     D1: owners + boxes (PK localpart+domain)
-wrangler.jsonc конфиг Worker
-.github/workflows/ci.yml  npm ci → lint → test → dry-run
+email → MX → Cloudflare Email Routing (catch-all) → Worker.email()
+      → abuse checks → resolve (localpart, domain) → owner
+      → parse MIME → normalize → extract OTP → deliver to Telegram
+
+/start → Worker.fetch() webhook → create address → reply
+Cron   → Worker.scheduled() → purge expired addresses
 ```
 
-Проверки: `npm run check` (lint + test + dry-run) · по отдельности `npm test` / `npm run lint`.
+The core (`email-core`) is client-agnostic and tied to an **owner** abstraction, not to a Telegram chat — so a future browser-extension client can be added without rewriting the core. See [SPEC.md](SPEC.md) §13.
 
-## Деплой
+## Project layout
+
+```
+src/            email-core + Telegram client (Cloudflare Worker)
+  index.js        router: email() / fetch() / scheduled()
+  ingest.js       pipeline: parse → normalize → deliver
+  normalize.js    body cleanup + link tokenization
+  otp.js          scoring OTP extractor
+  boxes.js        addresses (gen/collision/limits)
+  owners.js       owners + telemetry
+  render.js       Telegram message builder
+  delivery.js     deliver(owner, msg) seam
+  strings.js      i18n (ru/en)
+test/           node:test suites
+landing/        Vite MPA landing (Cloudflare Pages), RU + EN
+schema.sql      D1 schema (owners + boxes)
+SPEC.md         technical specification
+cloudflare.md   infrastructure & deploy runbook
+```
+
+## Development
 
 ```bash
+git clone https://github.com/investblog/mailbot.git
+cd mailbot
+
+# Worker (email-core + bot)
 npm install
+npm test          # node --test (otp/normalize/render/ratelimit/boxes/delivery/strings)
+npm run lint      # ESLint
+npm run check     # lint + test + wrangler dry-run
 
-wrangler d1 create gotemail                 # вставить database_id в wrangler.jsonc
-wrangler kv namespace create RL             # вставить id в wrangler.jsonc
-npm run db:init                             # применить schema.sql на remote
-
-wrangler secret put TG_TOKEN                # токен бота
-wrangler secret put TG_SECRET               # любой секрет для защиты вебхука
-wrangler secret put INGEST_SECRET           # (опц.) для HTTP-приёма от своего MX-релея
-
-wrangler deploy
-
-# вебхук бота (с проверкой секрета):
-curl "https://api.telegram.org/bot$TG_TOKEN/setWebhook" \
-  -d url="https://gotemailbot.<sub>.workers.dev/webhook" \
-  -d secret_token="$TG_SECRET"
+# Landing (RU + EN)
+cd landing
+npm install
+npm run build     # EN at /, RU at /ru/
+npm run build:ru  # RU at root (for emailbot.ru)
 ```
 
-**Email Routing** (только через дашборд/API, в wrangler нет inbound-правил):
-домен → Email → включить Routing (пропишет MX/TXT) → Routes → **Catch-all → Send to a Worker → gotemailbot**. Повторить для каждого домена из `DOMAINS`.
+Deploy and infrastructure details (D1/KV, Email Routing, secrets, scopes): [cloudflare.md](cloudflare.md).
 
-## План Б (если CF свернёт routing на зоне)
+## Tech stack
 
-`fetch()` принимает сырой MIME на `POST /ingest?to=&from=` с `Authorization: Bearer $INGEST_SECRET`.
-Любой внешний MX (Yandex 360 для бизнеса, postfix на VPS) может форвардить письма сюда — `email()` и `/ingest` делят один конвейер `ingest()`.
+- **Cloudflare Workers** — `email()` + `fetch()` + `scheduled()`, `nodejs_compat`
+- **D1** (SQLite) — owners + addresses · **KV** — rate-limit/denylist · **Cron** — cleanup
+- **[PostalMime](https://github.com/postalsys/postal-mime)** — MIME parsing · `HTMLRewriter` — HTML→text
+- **Landing:** Vite + vanilla TS, design system from [301-ui](https://301.st), Cloudflare Pages
+- Telegram Bot API over plain `fetch()` — no SMTP, no external services
 
-## Локальная разработка
+## Privacy
 
-```bash
-npm run db:init:local
-echo "TG_TOKEN=..." > .dev.vars
-wrangler dev
-```
+On MVP, emails are **not stored** — they are parsed at Cloudflare's edge and delivered to your Telegram chat, where they live with you. Addresses are temporary by design and expire after 24h. It's a throwaway address for catching one-time codes — not for important mail.
+
+## License
+
+[MIT](LICENSE)
+
+---
+
+Built by [investblog](https://github.com/investblog) with [Claude](https://claude.ai)

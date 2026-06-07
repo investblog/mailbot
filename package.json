@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "MailBot — disposable email in Telegram, OTP on the first line. Edge-first on Cloudflare.",
+  "license": "MIT",
+  "author": "investblog",
+  "homepage": "https://mailbot.click",
+  "repository": { "type": "git", "url": "https://github.com/investblog/mailbot.git" },
+  "keywords": ["telegram-bot", "disposable-email", "temp-mail", "otp", "cloudflare-workers", "email-routing"],
   "scripts": {
     "test": "node --experimental-sqlite --test",
     "lint": "eslint .",
