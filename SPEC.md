@@ -253,29 +253,32 @@ Vars (с дефолтами, переопределяются на деплое)
 
 ---
 
-## 13. Future clients / Browser Extension (вне MVP)
+## 13. Browser Extension (второй клиент) — реализовано
 
-Зафиксировано как контракт, **в текущем MVP не реализуется**. Цель раздела — чтобы ядро уже было готово, а расширение добавлялось отдельной фазой.
+Бэкенд (Part A) и само расширение (Part B) **реализованы**. Ядро осталось client-agnostic.
 
 **Клиенты email-core:**
-- **Telegram bot** — первый клиент (реализован). Письма не хранятся: доставляются только в чат.
-- **Browser extension** — будущий второй клиент (`owner.kind='extension'`/`'account'`). Расширение должно само показывать OTP/inbox, поэтому потребует **хранения входящих событий с TTL** (D1/R2), в отличие от Telegram.
+- **Telegram bot** — первый клиент. Письма НЕ хранятся: доставляются только в чат.
+- **Browser extension** (`extension/`, WXT, Chrome/Edge MV3 + Firefox MV2) — `owner.kind='extension'`. Сам показывает OTP/inbox, поэтому **хранит нормализованные события в D1** (`messages`, текст, TTL=жизнь адреса, чистка по Cron). Доставка к юзеру — **polling** (popup открыт: 2.5с; фон: alarm 1 мин + `chrome.notifications`).
 
-**Auth (решение позже, не сейчас):**
-- `TG_SECRET`/`INGEST_SECRET` — **НЕ** user-auth и расширением не используются (`TG_SECRET` — доверие к Telegram, `INGEST_SECRET` — к своему MX-релею).
-- Для расширения — отдельная модель: anonymous device token / account token / passkey. Выбор отложен.
-- `/ingest` остаётся **internal-only** (MX-релей), не публичный API.
+**Auth — анонимный device-token (реализовано):**
+- Расширение генерит `deviceSecret` (32B base64url) в `storage.local`; Bearer на каждый запрос.
+- Сервер хеширует (sha256) → owner `ext:<hash>`; БД хранит **только хеш**. `/api/session` создаёт owner, требует валидный токен; формат строгий (иначе 400).
+- `TG_SECRET`/`INGEST_SECRET` — НЕ user-auth, расширением не используются. `/ingest` остаётся **internal-only**.
+- Аккаунт (email/passkey) поверх device-token — фаза 3.
 
-**Future Extension API (контракт, помечен вне MVP):**
+**Extension API (`src/api.js`, реализовано):**
 ```
-POST   /api/session            — выдать/обновить device/account токен
+POST   /api/session            — создать owner из device-token (Bearer)
 GET    /api/boxes              — список адресов владельца
-POST   /api/boxes             — создать адрес
-POST   /api/boxes/:id/extend  — продлить
-DELETE /api/boxes/:id         — удалить
-GET    /api/messages          — входящие события (только если включено хранение)
+POST   /api/boxes             — создать адрес (rate-limit)
+POST   /api/boxes/:addr/extend — продлить (ownership в SQL)
+DELETE /api/boxes/:addr       — удалить (ownership в SQL)
+GET    /api/messages?cursor=  — входящие после курсора (monotonic `ms:id`)
 GET    /api/messages/:id      — одно событие
 ```
-Правила: требует user/device auth; `/api/messages` доступен только при включённом хранении; все события с TTL; raw MIME и вложения в extension-MVP не хранить без отдельного решения.
+Правила: device-auth на всех; курсор `created_at_ms:id` (не теряет письма с одинаковым ms); все события с TTL; CORS `*` (Bearer, без cookies) + OPTIONS; raw MIME/вложения НЕ хранятся. payload версионирован (`v:1`).
 
-**Delivery seam уже готов:** `deliver(owner, msg)` диспатчит по `owner.kind`. Добавление клиента = новая ветка `deliver` (запись события) + чтение через API, **без правок ingest/boxes/otp/html**.
+**Delivery seam:** `deliver(owner, msg)` диспатчит по `owner.kind` (`telegram` → sendMessage; `extension`/`account` → `storeMessage` в D1). Добавление клиента не трогает ingest/boxes/otp/normalize.
+
+**Фаза 3 (не сделано):** автозаполнение OTP (content-script), аккаунт поверх device-token, Web Push для фоновой низкой задержки (`fastweb-cam/workers/push-cdn`), raw MIME/R2 для полного рендера, кастом-домен `api.mailbot.click`.
