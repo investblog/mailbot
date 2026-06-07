@@ -1,11 +1,10 @@
 // Клиент: Telegram-бот поверх email-core. Команды /start /new /help + кнопки.
 // Маппит Telegram chat_id → owner(kind='telegram'); язык UI — по locale (language_code).
 
-import { config, pickDomain } from './config.js';
-import { createBox, activeBoxes, enforceActiveLimit, extendBox } from './boxes.js';
-import { upsertOwner, ensureOwner, incOwner } from './owners.js';
+import { config } from './config.js';
+import { activeBoxes, extendBox, provisionBox } from './boxes.js';
+import { upsertOwner, ensureOwner } from './owners.js';
 import { sendMessage, answerCallback, keyboard, esc } from './telegram.js';
-import { newBoxLimited } from './ratelimit.js';
 import { strings, fmt } from './strings.js';
 
 const KIND = 'telegram';
@@ -22,15 +21,8 @@ function fmtAddress(s, address, expiresAt) {
   return fmt(s.address, { addr: esc(address), h: hours });
 }
 
-// Создаёт адрес для владельца. null если упёрлись в rate-limit на /new.
-async function newAddress(env, cfg, owner, locale) {
-  if (await newBoxLimited(env, cfg, owner.id)) return null;
-  await enforceActiveLimit(env, owner.id, cfg.maxActive);
-  const domain = pickDomain(cfg.domains, locale);
-  const box = await createBox(env, owner.id, domain, cfg.ttlHours);
-  await incOwner(env, owner.id, 'boxes_total');
-  return box;
-}
+// Создаёт адрес для владельца (общая core-логика). null если упёрлись в rate-limit на /new.
+const newAddress = (env, cfg, owner, locale) => provisionBox(env, cfg, owner, locale);
 
 export async function handleUpdate(update, env) {
   const cfg = config(env);
@@ -95,8 +87,8 @@ async function handleCallback(cq, env, cfg) {
       return answerCallback(env, cq.id);
     }
     const b = active[0];
-    const exp = await extendBox(env, b.localpart, b.domain, cfg.ttlHours);
-    await sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, exp), kb(s));
+    const exp = await extendBox(env, owner.id, b.localpart, b.domain, cfg.ttlHours);
+    await sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, exp || b.expires_at), kb(s));
     return answerCallback(env, cq.id, s.okExtend);
   }
 

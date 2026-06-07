@@ -17,7 +17,10 @@ export function makeEnv() {
         bind(...a) { args = a; return this; },
         async first() { const r = db.prepare(sql).get(...args); return r ?? null; },
         async all() { return { results: db.prepare(sql).all(...args) }; },
-        async run() { db.prepare(sql).run(...args); return { success: true }; },
+        async run() {
+          const r = db.prepare(sql).run(...args);
+          return { success: true, meta: { changes: r.changes, last_row_id: r.lastInsertRowid } };
+        },
       };
     },
   };

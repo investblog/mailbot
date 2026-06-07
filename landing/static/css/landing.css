@@ -402,6 +402,14 @@ img, svg { display: block; }
   align-items: center;
   gap: var(--space-2);
   margin-inline-start: auto;
+  min-width: 0; /* позволяем ужиматься, не распирая шапку */
+}
+
+/* На мобиле прячем длинный CTA из шапки — он распирал навбар шире вьюпорта
+   (горизонтальный скролл). В hero своя кнопка + дубль в мобильном меню. */
+.nav__actions a.btn { display: none; }
+@media (min-width: 768px) {
+  .nav__actions a.btn { display: inline-flex; }
 }
 
 /* Language dropdown */

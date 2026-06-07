@@ -1,6 +1,8 @@
 // email-core: адреса (генерация, коллизии, резолв, лимиты). Привязка к OWNER, не к клиенту.
 
-import { now } from './config.js';
+import { now, pickDomain } from './config.js';
+import { newBoxLimited } from './ratelimit.js';
+import { incOwner } from './owners.js';
 
 // Алфавит без неоднозначных символов (нет 0/o, 1/l/i). 31 символ.
 const ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
@@ -78,11 +80,30 @@ export async function deleteBoxesForOwner(env, ownerId) {
   await env.DB.prepare('DELETE FROM boxes WHERE owner_id = ?').bind(ownerId).run();
 }
 
-// Продлить адрес на ttlHours от текущего момента.
-export async function extendBox(env, localpart, domain, ttlHours) {
+// Удалить один адрес владельца. Ownership в SQL. Возвращает true, если что-то удалено.
+export async function deleteBox(env, ownerId, localpart, domain) {
+  const res = await env.DB
+    .prepare('DELETE FROM boxes WHERE owner_id = ? AND localpart = ? AND domain = ?')
+    .bind(ownerId, localpart, domain).run();
+  return (res?.meta?.changes || 0) > 0;
+}
+
+// Продлить адрес владельца на ttlHours. Ownership в SQL. null, если адрес не принадлежит владельцу.
+export async function extendBox(env, ownerId, localpart, domain, ttlHours) {
   const expires = now() + ttlHours * 3600;
-  await env.DB
-    .prepare('UPDATE boxes SET expires_at = ? WHERE localpart = ? AND domain = ?')
-    .bind(expires, localpart, domain).run();
-  return expires;
+  const res = await env.DB
+    .prepare('UPDATE boxes SET expires_at = ? WHERE owner_id = ? AND localpart = ? AND domain = ?')
+    .bind(expires, ownerId, localpart, domain).run();
+  return (res?.meta?.changes || 0) > 0 ? expires : null;
+}
+
+// Провизия адреса для владельца с лимитами (общая для бота и API).
+// Возвращает box, либо null если упёрлись в rate-limit на создание.
+export async function provisionBox(env, cfg, owner, locale) {
+  if (await newBoxLimited(env, cfg, owner.id)) return null;
+  await enforceActiveLimit(env, owner.id, cfg.maxActive);
+  const domain = pickDomain(cfg.domains, locale);
+  const box = await createBox(env, owner.id, domain, cfg.ttlHours);
+  await incOwner(env, owner.id, 'boxes_total');
+  return box;
 }

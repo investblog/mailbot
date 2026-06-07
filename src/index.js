@@ -5,7 +5,9 @@ import { config, now } from './config.js';
 import { resolveBox } from './boxes.js';
 import { handleUpdate } from './bot.js';
 import { ingest } from './ingest.js';
+import { handleApi } from './api.js';
 import { isDenied, addressLimited } from './ratelimit.js';
+import { deleteExpiredMessages } from './messages.js';
 
 export default {
   // === Приём почты от Cloudflare Email Routing ===
@@ -32,7 +34,7 @@ export default {
     if (await addressLimited(env, cfg, to)) return message.setReject('550 5.7.1 rate limited');
 
     const raw = new Uint8Array(await new Response(message.raw).arrayBuffer());
-    await ingest(env, cfg, ctx, box.owner, raw, from);
+    await ingest(env, cfg, ctx, { localpart, domain, expires_at: box.expires_at, owner: box.owner }, raw, from);
     // Исход доставки не влияет на SMTP-ответ (transient уже отретраен; permanent-bounce был бы хуже потери).
   },
 
@@ -74,10 +76,15 @@ export default {
       if (await addressLimited(env, cfg, to)) return new Response('rate limited', { status: 550 });
       const raw = new Uint8Array(await request.arrayBuffer());
       if (raw.byteLength > cfg.maxRawBytes) return new Response('message too large', { status: 413 });
-      const r = await ingest(env, cfg, ctx, box.owner, raw, from);
+      const r = await ingest(env, cfg, ctx, { localpart, domain, expires_at: box.expires_at, owner: box.owner }, raw, from);
       // На релее ретрай возможен: транзиент → 503, иначе принято.
       if (!r.delivered && !r.permanent) return new Response('retry later', { status: 503 });
       return new Response('ok');
+    }
+
+    // === Публичный API расширения (анонимный device-token) ===
+    if (url.pathname === '/api/' || url.pathname.startsWith('/api/')) {
+      return handleApi(request, env, ctx);
     }
 
     return new Response('gotemailbot', { status: 200 });
@@ -85,9 +92,8 @@ export default {
 
   // === Cron: физическое удаление протухших строк (логически они уже мертвы) ===
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      env.DB.prepare('DELETE FROM boxes WHERE expires_at <= ?').bind(now()).run()
-    );
+    ctx.waitUntil(env.DB.prepare('DELETE FROM boxes WHERE expires_at <= ?').bind(now()).run());
+    ctx.waitUntil(deleteExpiredMessages(env));
   },
 };
 

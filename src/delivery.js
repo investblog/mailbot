@@ -9,16 +9,34 @@
 import { renderEmail } from './render.js';
 import { sendMessage } from './telegram.js';
 import { deleteBoxesForOwner } from './boxes.js';
+import { storeMessage } from './messages.js';
 
 export async function deliver(env, ctx, owner, msg) {
   switch (owner.kind) {
     case 'telegram':
       return deliverTelegram(env, ctx, owner, msg);
-    // Будущее: case 'extension' / 'account' → записать message-event в D1/R2 с TTL,
-    //          расширение читает через /api/messages. См. SPEC §13.
+    case 'extension':
+    case 'account':
+      return deliverStore(env, owner, msg);
     default:
       console.error(`deliver: unsupported owner kind ${owner.kind}`);
       return { delivered: false, permanent: true };
+  }
+}
+
+// Клиенты, которые показывают письма сами: сохраняем нормализованное событие в D1 (TTL = жизнь адреса).
+// Расширение читает через GET /api/messages. msg.box = { localpart, domain, expires_at }.
+async function deliverStore(env, owner, msg) {
+  if (!msg.box) {
+    console.error('deliverStore: msg.box missing');
+    return { delivered: false, permanent: true };
+  }
+  try {
+    await storeMessage(env, owner, msg.box, msg);
+    return { delivered: true };
+  } catch (e) {
+    console.error('deliverStore failed', e);
+    return { delivered: false, permanent: false }; // транзиент БД → апстрим может ретраить
   }
 }
 

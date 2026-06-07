@@ -10,7 +10,9 @@ import { incOwner, getOwnerById, setLastPromo } from './owners.js';
 import { maybePromo } from './promo.js';
 
 // Возвращает исход доставки { delivered, permanent } (см. delivery.js).
-export async function ingest(env, cfg, ctx, owner, raw, from) {
+// box = { localpart, domain, expires_at, owner } — адрес-получатель и его владелец.
+export async function ingest(env, cfg, ctx, box, raw, from) {
+  const owner = box.owner;
   let parsed;
   try {
     parsed = await PostalMime.parse(raw);
@@ -35,7 +37,12 @@ export async function ingest(env, cfg, ctx, owner, raw, from) {
   const attachments = (parsed.attachments || []).map((a) => a.filename || 'файл');
 
   // Нормализованное сообщение — без знания о клиенте. lang — по локали владельца.
-  const msg = { from, subject, bodyTokens: norm.tokens, links, otp, attachments, lang: owner.locale };
+  // msg.box нужен клиентам с хранением (расширение); Telegram-ветка его игнорирует.
+  const msg = {
+    from, subject, bodyTokens: norm.tokens, plain: norm.plain, links, otp, attachments,
+    lang: owner.locale,
+    box: { localpart: box.localpart, domain: box.domain, expires_at: box.expires_at },
+  };
   const outcome = await deliver(env, ctx, owner, msg);
 
   // Телеметрия + промо — только при успешной доставке, вне горячего пути.

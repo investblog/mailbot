@@ -24,4 +24,5 @@ export function pickDomain(domains, locale) {
   return domains.find((d) => !d.endsWith('.ru')) || domains[0];
 }
 
-export const now = () => Math.floor(Date.now() / 1000);
+export const now = () => Math.floor(Date.now() / 1000); // unix seconds (boxes/owners TTL)
+export const nowMs = () => Date.now();                  // unix ms (messages cursor для polling)
