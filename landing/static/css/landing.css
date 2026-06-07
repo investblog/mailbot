@@ -358,7 +358,7 @@ img, svg { display: block; }
 
 .nav__logo .icon {
   width: 1.75em; height: 1.75em;
-  color: var(--primary); /* лого: фигура — brand-цвет, детали — белые (контраст на обеих темах) */
+  /* лого многоцветное: тело — currentColor (тема), контур/точки/полоски — свои цвета из SVG */
 }
 
 .nav__links {

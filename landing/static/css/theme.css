@@ -200,9 +200,9 @@
     Primary uses blue-500:
     - #3475C0 with white text ≈ 4.72:1 (AA for normal text).
   */
-  --primary: #3475C0;
-  --primary-soft: rgba(77, 163, 255, 0.1);
-  --primary-hover: #4DA3FF;
+  --primary: #fe4622; /* brand accent из лого MailBot */
+  --primary-soft: rgba(254, 70, 34, 0.12);
+  --primary-hover: #ff6a4d;
 
   --ok: var(--success);
 
@@ -265,9 +265,9 @@
     Primary uses blue-700:
     - #0055DC with white text ≈ 6.30:1 (AA).
   */
-  --primary: #0055DC;
-  --primary-soft: rgba(0, 85, 220, 0.08);
-  --primary-hover: #003682; /* even higher contrast */
+  --primary: #fe4622; /* brand accent из лого MailBot */
+  --primary-soft: rgba(254, 70, 34, 0.10);
+  --primary-hover: #d8390f; /* darker для контраста на светлой теме */
 
   --brand: var(--primary);
 
