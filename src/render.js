@@ -12,6 +12,7 @@ const ATTACH_NAME_MAX = 100;
 const OTP_MAX = 32;
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+const escAttr = (s) => String(s).replace(/[&<>"]/g, (c) => (c === '"' ? '&quot;' : ESC[c]));
 
 // Экранирует и обрезает по ИТОГОВОЙ (escaped) длине, посимвольно — никогда не разрезая entity.
 // Это закрывает класс бага «срез внутри &lt;/&amp; → malformed HTML → Telegram 400 → дроп письма».
@@ -29,7 +30,38 @@ function escClip(raw, max) {
   return out;
 }
 
-export function renderEmail({ from, subject, body, links, otp, attachments }) {
+// Только http(s) — никаких javascript:/data: в href.
+function safeHref(href) {
+  return /^https?:\/\//i.test(String(href || '')) ? String(href) : null;
+}
+function hostOf(href) {
+  const m = String(href).match(/^https?:\/\/([^/?#]+)/i);
+  return m ? m[1] : href;
+}
+
+// Рендер тела из токенов normalize.js: текст — escape с бюджетом, ссылки — наши <a href>.
+// Сами строим единственные разрешённые теги <a>; сырой <https://...> в сообщение не попадает.
+function renderBody(tokens, budget) {
+  let out = '';
+  for (const tok of tokens) {
+    const remaining = budget - out.length;
+    if (remaining <= 0) break;
+    if (tok.type === 'link') {
+      const href = safeHref(tok.href);
+      if (!href) { out += escClip(tok.label || '', remaining); continue; }
+      let label = (tok.label || '').trim() || hostOf(href);
+      if (label.length > 80) label = label.slice(0, 80);
+      const seg = `<a href="${escAttr(href)}">${escClip(label, 80)}</a>`;
+      if (seg.length <= remaining) out += seg; // ссылка атомарна: влезла — добавили, нет — стоп
+      else break;
+    } else {
+      out += escClip(tok.value, remaining);
+    }
+  }
+  return out;
+}
+
+export function renderEmail({ from, subject, bodyTokens, body, links, otp, attachments }) {
   // Заголовок (с тегами) — сохраняем целиком, поэтому каждое поле ограничено по escaped-длине.
   const head = [];
   if (otp) head.push(`🔑 <b>${escClip(otp, OTP_MAX)}</b>  <code>${escClip(otp, OTP_MAX)}</code>`);
@@ -49,11 +81,15 @@ export function renderEmail({ from, subject, body, links, otp, attachments }) {
   const headStr = head.join('\n');
   const footStr = foot.join('\n');
 
-  // Тело получает остаток бюджета (в escaped-символах). escClip гарантирует валидность entity.
-  // Все части ограничены по escaped-длине, поэтому итог ≤ TG_MSG_LIMIT по конструкции — clamp не нужен.
+  // Тело получает остаток бюджета. Токены (text/link) рендерим entity-safe; ссылки атомарны.
+  // Все части ограничены по длине, поэтому итог ≤ TG_MSG_LIMIT по конструкции — clamp не нужен.
   const reserved = headStr.length + footStr.length + 3; // \n\n + \n
   const budget = Math.max(0, TG_MSG_LIMIT - reserved);
-  const bodyStr = escClip(body || '(пустое тело)', budget);
+  // bodyTokens — основной путь; body-строка оставлена для обратной совместимости/тестов.
+  const tokens = bodyTokens && bodyTokens.length
+    ? bodyTokens
+    : [{ type: 'text', value: body || '(пустое тело)' }];
+  const bodyStr = renderBody(tokens, budget) || escClip('(пустое тело)', budget);
 
   let out = `${headStr}\n\n${bodyStr}`;
   if (footStr) out += `\n${footStr}`;

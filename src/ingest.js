@@ -4,6 +4,7 @@
 import PostalMime from 'postal-mime';
 import { extractOtp } from './otp.js';
 import { htmlToText } from './html.js';
+import { normalizeBody } from './normalize.js';
 import { deliver } from './delivery.js';
 import { incOwner, getOwnerById, setLastPromo } from './owners.js';
 import { maybePromo } from './promo.js';
@@ -26,11 +27,15 @@ export async function ingest(env, cfg, ctx, owner, raw, from) {
     body = out.text;
     links = out.links;
   }
-  const otp = extractOtp(subject, body);
+
+  // Нормализация: чистка мусора + разбор ссылок в токены. OTP ищем по очищенному plain
+  // (скрытые символы и markdown-звёздочки иначе мешают скорингу/ключевым словам).
+  const norm = normalizeBody(body);
+  const otp = extractOtp(subject, norm.plain);
   const attachments = (parsed.attachments || []).map((a) => a.filename || 'файл');
 
   // Нормализованное сообщение — без знания о клиенте.
-  const msg = { from, subject, body, links, otp, attachments };
+  const msg = { from, subject, bodyTokens: norm.tokens, links, otp, attachments };
   const outcome = await deliver(env, ctx, owner, msg);
 
   // Телеметрия + промо — только при успешной доставке, вне горячего пути.
