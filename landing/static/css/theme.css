@@ -203,6 +203,8 @@
   --primary: #fe4622; /* brand accent из лого MailBot */
   --primary-soft: rgba(254, 70, 34, 0.12);
   --primary-hover: #ff6a4d;
+  --tg: #355ff5; /* второй акцент (синий из лого) — CTA «Открыть в Telegram» */
+  --tg-hover: #5a7bff;
 
   --ok: var(--success);
 
@@ -268,6 +270,8 @@
   --primary: #fe4622; /* brand accent из лого MailBot */
   --primary-soft: rgba(254, 70, 34, 0.10);
   --primary-hover: #d8390f; /* darker для контраста на светлой теме */
+  --tg: #355ff5; /* второй акцент (синий из лого) — CTA «Открыть в Telegram» */
+  --tg-hover: #2347d6;
 
   --brand: var(--primary);
 

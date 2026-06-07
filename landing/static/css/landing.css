@@ -153,6 +153,16 @@ img, svg { display: block; }
   border-color: color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
+/* Второй акцент: CTA «Открыть в Telegram» — синий из лого */
+.btn--tg {
+  background: var(--tg);
+  color: var(--btn-text-on-dark);
+}
+.btn--tg:hover {
+  background: var(--tg-hover);
+  border-color: color-mix(in srgb, var(--tg) 35%, transparent);
+}
+
 .btn--ghost {
   background: transparent;
   color: var(--text-main);
