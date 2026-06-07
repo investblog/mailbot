@@ -1,7 +1,7 @@
 import type { TranslationMap } from '../i18n';
 
 const ru: TranslationMap = {
-  'meta.title': 'gotemailbot — одноразовая почта в Telegram',
+  'meta.title': 'MailBot — одноразовая почта в Telegram',
   'meta.description': 'Одноразовая почта прямо в Telegram. Жми /start, получай адрес — всё, что на него придёт, прилетит в чат, OTP-код первой строкой. Адрес живёт 24 часа и протухает сам. Письма не храним.',
 
   'nav.how': 'Как работает',
@@ -61,7 +61,7 @@ const ru: TranslationMap = {
   'cta.text': 'Это один тап. Остальное сделает бот.',
   'cta.button': 'Открыть в Telegram',
 
-  'footer.copy': '© {year} gotemailbot',
+  'footer.copy': '© {year} MailBot',
   'footer.telegram': 'Бот в Telegram',
 };
 

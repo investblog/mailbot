@@ -1,7 +1,7 @@
 import type { TranslationMap } from '../i18n';
 
 const en: TranslationMap = {
-  'meta.title': 'gotemailbot — Disposable email in Telegram',
+  'meta.title': 'MailBot — Disposable email in Telegram',
   'meta.description': 'Disposable email inside Telegram. Press /start, get an address, every message lands in your chat — the OTP code on the first line. Lives 24h, then expires. Nothing stored.',
 
   'nav.how': 'How it works',
@@ -61,7 +61,7 @@ const en: TranslationMap = {
   'cta.text': 'It takes one tap. The bot does the rest.',
   'cta.button': 'Open in Telegram',
 
-  'footer.copy': '© {year} gotemailbot',
+  'footer.copy': '© {year} MailBot',
   'footer.telegram': 'Telegram bot',
 };
 
