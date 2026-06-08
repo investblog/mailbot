@@ -47,8 +47,9 @@ body.sidepanel { width: 100%; height: 100vh; max-height: none; }
 .addr-row code {
   flex: 1; background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: var(--radius);
   padding: 9px 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); cursor: pointer;
 }
+.addr-row code:hover { border-color: var(--border-strong); }
 .addr-meta { font-size: var(--fs-xs); color: var(--text-muted); }
 .addr-actions { display: flex; gap: var(--space-2); }
 
@@ -69,21 +70,57 @@ body.sidepanel { width: 100%; height: 100vh; max-height: none; }
 .list { display: flex; flex-direction: column; gap: var(--space-2); }
 .empty { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.5; }
 
-.msg {
+/* Inbox — компактные строки-заголовки; полное письмо открывается в дровере. */
+.msg-row {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; text-align: left; cursor: pointer;
   background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-  padding: var(--space-3); box-shadow: var(--shadow-sm); transition: box-shadow var(--transition-fast);
+  padding: var(--space-2) var(--space-3); color: var(--text); font: inherit;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
-.msg:hover { box-shadow: var(--shadow-md); }
+.msg-row:hover { box-shadow: var(--shadow-sm); border-color: var(--border-strong); }
+.msg-row__main { flex: 1; min-width: 0; }
+.msg-row__subj { font-weight: var(--fw-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg-row__from { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg-row__side { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+.msg-row__time { font-size: var(--fs-xs); color: var(--text-subtle); }
+
+/* OTP-бейдж (тап = копировать), компактный в строке и крупный в дровере. */
 .otp {
-  display: inline-block; cursor: pointer; font-family: ui-monospace, monospace; font-size: var(--fs-lg); font-weight: var(--fw-bold);
-  letter-spacing: .06em; color: #fff; background: var(--primary); border: none; border-radius: var(--radius);
-  padding: 4px 10px; margin-bottom: var(--space-2);
+  cursor: pointer; font-family: ui-monospace, monospace; font-weight: var(--fw-bold); letter-spacing: .05em;
+  color: #fff; background: var(--primary); border: none; border-radius: var(--radius); padding: 3px 8px; font-size: var(--fs-sm);
 }
 .otp:hover { background: var(--primary-hover); }
-.msg-subj { font-weight: var(--fw-semibold); }
-.msg-from { font-size: var(--fs-xs); color: var(--text-muted); margin-bottom: var(--space-2); }
-.msg-body { font-size: var(--fs-sm); white-space: pre-wrap; word-break: break-word; line-height: 1.45; max-height: 200px; overflow-y: auto; }
+.otp.is-success { background: var(--success); }
+.otp--lg { font-size: var(--fs-xl); padding: 6px 12px; align-self: flex-start; margin-bottom: var(--space-1); }
+
+/* Copy success-фидбек (house): иконка → check, цвет → success. */
+.icon-btn.is-success { color: var(--success); }
+
+/* Drawer (house) — полное письмо. */
+.drawer { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: flex-end; overflow: hidden; }
+.drawer__overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); cursor: pointer; }
+.drawer__panel {
+  position: relative; width: 100%; max-width: 560px; max-height: 100%; background: var(--bg);
+  border-left: 1px solid var(--border-subtle); display: flex; flex-direction: column;
+  animation: drawerSlideIn 200ms ease-out; z-index: 1;
+}
+@keyframes drawerSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.drawer__header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+}
+.drawer__title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); margin: 0; word-break: break-word; }
+.drawer__close {
+  display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
+  border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: var(--radius); flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.drawer__close:hover { background: var(--bg-soft); color: var(--text); }
+.drawer__body { flex: 1; overflow-y: auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.msg-from { font-size: var(--fs-sm); color: var(--text-muted); }
+.msg-body { font-size: var(--fs-sm); white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
 .msg-body a { color: var(--tg); }
+.msg-attach { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* Footer (house) */
 .popup__footer {
