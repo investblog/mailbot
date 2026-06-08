@@ -21,21 +21,33 @@ export default defineConfig({
     description: 'Disposable email addresses with OTP detection, right in your browser.',
     homepage_url: 'https://mailbot.click',
 
-    permissions: ['storage', 'alarms', 'notifications'],
-    // Доступ только к нашему API (CORS на сервере = *). Никаких *://*/*.
+    // Доступ только к нашему API (CORS на сервере = *). sidePanel — chrome/edge.
+    permissions: browser === 'firefox'
+      ? ['storage', 'alarms', 'notifications']
+      : ['storage', 'alarms', 'notifications', 'sidePanel'],
     host_permissions: ['https://api.mailbot.click/*'],
 
     icons: {
       16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png', 128: 'icon/128.png', 256: 'icon/256.png',
     },
 
+    // Один popup.html служит и popup, и боковой панелью (?sidepanel=1).
     action: {
       default_title: 'MailBot',
       default_popup: 'popup.html',
       default_icon: { 16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png', 128: 'icon/128.png' },
     },
 
+    ...(browser !== 'firefox' && {
+      side_panel: { default_path: 'popup.html?sidepanel=1' },
+    }),
+
     ...(browser === 'firefox' && {
+      sidebar_action: {
+        default_panel: 'popup.html?sidepanel=1',
+        default_title: 'MailBot',
+        default_icon: { 16: 'icon/16.png', 32: 'icon/32.png' },
+      },
       browser_specific_settings: {
         gecko: { id: 'mailbot@mailbot.click', strict_min_version: '115.0' },
       },

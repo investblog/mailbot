@@ -13,7 +13,8 @@
   `chrome.notifications` + badge; хаб для popup (GET_STATE/NEW_BOX/EXTEND/DELETE/POLL), сброс непрочитанного при открытии.
 - **popup/** — текущий адрес (копир), New/Extend/Delete, список входящих (новые сверху) с подсветкой OTP (тап=копир),
   поллинг каждые 2.5с пока открыт. **welcome/** — онбординг на установку.
-- **Дизайн:** бренд-токены (оранжевый `#fe4622`, синий `#355ff5` для TG-действия), light/dark по `prefers-color-scheme`.
+- **Дизайн (house standard из redirect-inspector):** дизайн-система `assets/css/theme.css` (токены, `data-theme` dark/light/auto), `shared/theme.ts` (тогл темы, localStorage). Хедер `popup__header` (лого+тайтл слева, тогл темы + pin справа), `popup__body`, `popup__footer`. Бренд: оранжевый `#fe4622`, синий `#355ff5` (TG).
+- **Side panel:** один `popup.html?sidepanel=1` служит и popup, и боковой панелью. Chrome/Edge — `side_panel` + кнопка «pin» (открыть панель); Firefox — `sidebar_action`.
 
 ## Архитектурные решения (зафиксированы владельцем)
 - Доставка — **polling** (открыт popup: 2.5с; фон: alarm 1 мин + нотификации). Web Push — фаза 2.

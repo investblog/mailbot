@@ -17,6 +17,9 @@ const EN: Dict = {
   open_tg: 'Also in Telegram',
   expires_in: 'expires in {h}h',
   error: 'Connection error. Retrying…',
+  toggleTheme: 'Toggle theme',
+  pin: 'Open in side panel',
+  github: 'Source on GitHub',
   'welcome.lead': 'Disposable email with OTP, right in your browser.',
   'welcome.s1': 'Click the MailBot icon to get a disposable address.',
   'welcome.s2': 'Paste it into any signup or login form.',
@@ -40,6 +43,9 @@ const RU: Dict = {
   open_tg: 'Ещё в Telegram',
   expires_in: 'протухнет через {h}ч',
   error: 'Ошибка связи. Повтор…',
+  toggleTheme: 'Сменить тему',
+  pin: 'Открыть в боковой панели',
+  github: 'Исходники на GitHub',
   'welcome.lead': 'Одноразовая почта с OTP — прямо в браузере.',
   'welcome.s1': 'Нажми иконку MailBot, чтобы получить одноразовый адрес.',
   'welcome.s2': 'Вставь его в любую форму регистрации или входа.',
@@ -63,5 +69,9 @@ export function applyI18n(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
     const k = el.getAttribute('data-i18n');
     if (k) el.textContent = t(k);
+  });
+  root.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach((el) => {
+    const k = el.getAttribute('data-i18n-title');
+    if (k) { el.title = t(k); el.setAttribute('aria-label', t(k)); }
   });
 }

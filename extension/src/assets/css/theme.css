@@ -1,0 +1,143 @@
+/* =========================
+   MailBot — THEME TOKENS (house standard, 301.st design system)
+   Бренд-акцент: оранжевый #fe4622; вторичный (TG-действие): синий #355ff5.
+   ========================= */
+
+:root {
+  color-scheme: light dark;
+
+  /* Brand */
+  --orange-500: #fe4622;
+  --orange-700: #e23a18;
+  --orange-900: #b32d0f;
+  --blue-700: #355ff5;
+  --blue-neon: #5a7bff;
+
+  /* Вторичный акцент — кнопки «Открыть/в Telegram» */
+  --tg: #355ff5;
+  --tg-hover: #2347d6;
+
+  /* Neutrals */
+  --gray-950: #000000;
+  --gray-900: #111111;
+  --gray-100: #F7F7F8;
+
+  /* Semantic */
+  --danger: #FF4F6E;
+  --success: #18C27A;
+  --warning: #FFB347;
+  --info: #3B82F6;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* Radii */
+  --radius-xs: 0.25rem;
+  --radius: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --r-pill: 999px;
+
+  --transition-fast: 120ms ease-out;
+  --transition-md: 160ms ease-out;
+
+  --shadow-sm-light: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md-light: 0 6px 18px rgba(0, 0, 0, 0.12);
+  --shadow-sm-dark: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md-dark: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-sm: var(--shadow-sm-light);
+  --shadow-md: var(--shadow-md-light);
+}
+
+/* DARK */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111111;
+  --bg-elevated: #181A1F;
+  --bg-soft: #1F2229;
+  --panel: var(--bg-elevated);
+  --text-main: #E7E9EE;
+  --text-muted: #A0A4AF;
+  --text-subtle: #7A7E87;
+  --text: var(--text-main);
+  --muted: var(--text-muted);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --shadow-sm: var(--shadow-sm-dark);
+  --shadow-md: var(--shadow-md-dark);
+  --primary: #fe4622;
+  --primary-soft: rgba(254, 70, 34, 0.14);
+  --primary-hover: #ff6a4d;
+  --brand: var(--primary);
+  --ok: var(--success);
+  --input-bg: rgba(15, 16, 22, 0.9);
+  --input-border: var(--border-subtle);
+}
+
+/* LIGHT */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #FFFFFF;
+  --bg-elevated: #F7F7F8;
+  --bg-soft: #F4F8FC;
+  --panel: var(--bg-elevated);
+  --text-main: #111111;
+  --text-muted: #666A73;
+  --text-subtle: #8A8F99;
+  --text: var(--text-main);
+  --muted: var(--text-muted);
+  --border-subtle: rgba(15, 23, 42, 0.06);
+  --border-strong: rgba(15, 23, 42, 0.16);
+  --shadow-sm: var(--shadow-sm-light);
+  --shadow-md: var(--shadow-md-light);
+  --primary: #fe4622;
+  --primary-soft: rgba(254, 70, 34, 0.08);
+  --primary-hover: #d8390f;
+  --brand: var(--primary);
+  --ok: var(--success);
+  --input-bg: #FFFFFF;
+  --input-border: var(--border-subtle);
+}
+
+/* AUTO — prefers-color-scheme когда data-theme не задан */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #111111; --bg-elevated: #181A1F; --bg-soft: #1F2229; --panel: var(--bg-elevated);
+    --text-main: #E7E9EE; --text-muted: #A0A4AF; --text-subtle: #7A7E87; --text: var(--text-main); --muted: var(--text-muted);
+    --border-subtle: rgba(255, 255, 255, 0.06); --border-strong: rgba(255, 255, 255, 0.14);
+    --shadow-sm: var(--shadow-sm-dark); --shadow-md: var(--shadow-md-dark);
+    --primary: #fe4622; --primary-soft: rgba(254, 70, 34, 0.14); --primary-hover: #ff6a4d;
+    --brand: var(--primary); --ok: var(--success); --input-bg: rgba(15, 16, 22, 0.9); --input-border: var(--border-subtle);
+  }
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg: #FFFFFF; --bg-elevated: #F7F7F8; --bg-soft: #F4F8FC; --panel: var(--bg-elevated);
+    --text-main: #111111; --text-muted: #666A73; --text-subtle: #8A8F99; --text: var(--text-main); --muted: var(--text-muted);
+    --border-subtle: rgba(15, 23, 42, 0.06); --border-strong: rgba(15, 23, 42, 0.16);
+    --shadow-sm: var(--shadow-sm-light); --shadow-md: var(--shadow-md-light);
+    --primary: #fe4622; --primary-soft: rgba(254, 70, 34, 0.08); --primary-hover: #d8390f;
+    --brand: var(--primary); --ok: var(--success); --input-bg: #FFFFFF; --input-border: var(--border-subtle);
+  }
+}
+
+a { color: inherit; }
