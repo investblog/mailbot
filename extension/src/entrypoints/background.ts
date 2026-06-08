@@ -19,11 +19,25 @@ async function ensureSession(): Promise<void> {
   try { await session(lang()); } catch { /* офлайн — попробуем позже */ }
 }
 
+// Самовосстановление: если owner ещё/уже не существует на сервере (401 "no session"),
+// создаём сессию из device-token и повторяем запрос один раз. Покрывает новый device-token,
+// смену ID распакованного расширения и несоздавшуюся при старте сессию — раньше это давало
+// залипшую «Connection error» (каждый POLL → 401 без выхода).
+async function withSession<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (!/\b401\b/.test(String(e))) throw e;
+    await session(lang());
+    return await fn();
+  }
+}
+
 // Фоновый опрос: новые письма → нотификация + badge. Курсор хранится локально.
 async function poll(): Promise<void> {
   try {
     const cur = ((await browser.storage.local.get(STORAGE.cursor))[STORAGE.cursor] as string) || '';
-    const { messages, next_cursor } = await getMessages(cur);
+    const { messages, next_cursor } = await withSession(() => getMessages(cur));
     if (!messages.length) return;
     for (const m of messages) {
       browser.notifications?.create(`mb-${m.id}`, {
@@ -43,12 +57,15 @@ async function poll(): Promise<void> {
 // Хаб для popup: любое действие → возвращаем свежее состояние и сбрасываем непрочитанное.
 async function handle(msg: Req): Promise<Res> {
   try {
-    if (msg.type === 'NEW_BOX') await createBox(lang());
-    else if (msg.type === 'EXTEND') await extendBox(msg.address);
-    else if (msg.type === 'DELETE') await deleteBox(msg.address);
+    const { boxes, messages, next_cursor } = await withSession(async () => {
+      if (msg.type === 'NEW_BOX') await createBox(lang());
+      else if (msg.type === 'EXTEND') await extendBox(msg.address);
+      else if (msg.type === 'DELETE') await deleteBox(msg.address);
 
-    const boxes = await getBoxes();
-    const { messages, next_cursor } = await getMessages('');
+      const boxes = await getBoxes();
+      const { messages, next_cursor } = await getMessages('');
+      return { boxes, messages, next_cursor };
+    });
     // popup открыт → всё прочитано: сбрасываем badge и двигаем курсор в конец.
     await browser.storage.local.set({ mb_unread: 0, [STORAGE.cursor]: next_cursor });
     await setBadge(0);

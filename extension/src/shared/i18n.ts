@@ -19,12 +19,15 @@ const EN: Dict = {
   error: 'Connection error. Retrying…',
   toggleTheme: 'Toggle theme',
   pin: 'Open in side panel',
+  collapse: 'Collapse panel',
   github: 'Source on GitHub',
   close: 'Close',
   'welcome.lead': 'Disposable email with OTP, right in your browser.',
   'welcome.s1': 'Click the MailBot icon to get a disposable address.',
   'welcome.s2': 'Paste it into any signup or login form.',
-  'welcome.s3': 'The email — and the OTP code — appear in the popup.',
+  'welcome.s3': 'The email — and the OTP code — appear in the panel.',
+  'welcome.open': 'Open the panel',
+  'welcome.pinHint': 'Click the MailBot icon in the toolbar to open it.',
   'welcome.tg': 'Also available in Telegram',
 };
 
@@ -46,12 +49,15 @@ const RU: Dict = {
   error: 'Ошибка связи. Повтор…',
   toggleTheme: 'Сменить тему',
   pin: 'Открыть в боковой панели',
+  collapse: 'Свернуть панель',
   github: 'Исходники на GitHub',
   close: 'Закрыть',
   'welcome.lead': 'Одноразовая почта с OTP — прямо в браузере.',
   'welcome.s1': 'Нажми иконку MailBot, чтобы получить одноразовый адрес.',
   'welcome.s2': 'Вставь его в любую форму регистрации или входа.',
-  'welcome.s3': 'Письмо — и OTP-код — появятся в попапе.',
+  'welcome.s3': 'Письмо — и OTP-код — появятся в панели.',
+  'welcome.open': 'Открыть панель',
+  'welcome.pinHint': 'Нажми иконку MailBot на панели инструментов, чтобы открыть.',
   'welcome.tg': 'Также доступно в Telegram',
 };
 

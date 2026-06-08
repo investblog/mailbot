@@ -12,8 +12,14 @@
     h1 { margin: var(--space-4) 0 var(--space-1); }
     p.lead { color: var(--text-muted); font-size: var(--fs-lg); margin: 0 0 var(--space-5); }
     ol { text-align: left; display: inline-block; line-height: 1.9; font-size: var(--fs-md); color: var(--text); }
-    .cta { display: inline-flex; gap: var(--space-2); align-items: center; margin-top: var(--space-5); background: var(--tg); color: #fff; text-decoration: none; padding: 11px 18px; border-radius: var(--r-pill); font-weight: var(--fw-semibold); }
-    .cta:hover { background: var(--tg-hover); }
+    .actions { display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap; margin-top: var(--space-6); }
+    .btn { display: inline-flex; gap: var(--space-2); align-items: center; text-decoration: none; padding: 11px 18px; border-radius: var(--r-pill); font-weight: var(--fw-semibold); font-size: var(--fs-md); border: 0; cursor: pointer; font-family: inherit; }
+    .btn svg { width: 18px; height: 18px; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-tg { background: var(--tg); color: #fff; }
+    .btn-tg:hover { background: var(--tg-hover); }
+    .hint { color: var(--text-muted); font-size: var(--fs-sm); margin-top: var(--space-3); }
   </style>
 </head>
 <body>
@@ -26,9 +32,14 @@
       <li data-i18n="welcome.s2">Paste it into any signup or login form.</li>
       <li data-i18n="welcome.s3">The email — and the OTP code — appear in the panel.</li>
     </ol>
-    <div>
-      <a class="cta" href="https://t.me/gotemailbot" target="_blank" rel="noopener" data-i18n="welcome.tg">Also available in Telegram</a>
+    <div class="actions">
+      <button id="open-panel" class="btn btn-primary" type="button" data-i18n="welcome.open" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m10 15-3-3 3-3"/></svg>
+        Open the panel
+      </button>
+      <a class="btn btn-tg" href="https://t.me/gotemailbot" target="_blank" rel="noopener" data-i18n="welcome.tg">Also available in Telegram</a>
     </div>
+    <p class="hint" id="open-hint" data-i18n="welcome.pinHint" hidden>Click the MailBot icon in the toolbar to open it.</p>
   </div>
   <script type="module" src="./main.ts"></script>
 </body>

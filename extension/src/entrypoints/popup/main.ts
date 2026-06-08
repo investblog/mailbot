@@ -22,10 +22,18 @@ function updateThemeIcon(): void {
 updateThemeIcon();
 $('#theme-toggle').addEventListener('click', () => { toggleTheme(); updateThemeIcon(); });
 
-// --- pin to side panel (chrome/edge, popup mode only) ---
+// --- panel toggle: попап → открыть боковую панель; панель → свернуть её ---
 const sidePanel = (browser as { sidePanel?: { open(opts: { windowId?: number }): Promise<void> } }).sidePanel;
-if (!isSidepanel && sidePanel?.open) {
-  const pin = $('#pin');
+const pin = $('#pin');
+if (isSidepanel) {
+  // уже в панели — кнопка её сворачивает (закрытие страницы панели = collapse)
+  pin.hidden = false;
+  pin.querySelector('use')?.setAttribute('href', '#i-panel-close');
+  pin.title = t('collapse');
+  pin.setAttribute('aria-label', t('collapse'));
+  pin.addEventListener('click', () => window.close());
+} else if (sidePanel?.open) {
+  // в попапе — кнопка разворачивает докнутую панель
   pin.hidden = false;
   pin.addEventListener('click', async () => {
     try {
