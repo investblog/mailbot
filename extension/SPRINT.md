@@ -11,13 +11,16 @@
   `format.ts` (escape), `types.ts`, `constants.ts`.
 - **background.ts** — bootstrap сессии (onInstalled/onStartup), alarm `inbox-poll` (1 мин) → новые письма →
   `chrome.notifications` + badge; хаб для popup (GET_STATE/NEW_BOX/EXTEND/DELETE/POLL), сброс непрочитанного при открытии.
-- **popup/** — текущий адрес (копир), New/Extend/Delete, список входящих (новые сверху) с подсветкой OTP (тап=копир),
-  поллинг каждые 2.5с пока открыт. **welcome/** — онбординг на установку.
+- **popup/** — текущий адрес (клик/кнопка копируют, house success-фидбек: иконка→галочка, цвет→success ~1.4с),
+  New/Extend/Delete. Входящие — **компактные строки-заголовки** (тема/отправитель/время + маленький OTP-бейдж, тап=копир);
+  клик по строке открывает **полное письмо в дровере** (overlay + slide-in, закрытие Esc/overlay/крестик). **welcome/** — онбординг.
 - **Дизайн (house standard из redirect-inspector):** дизайн-система `assets/css/theme.css` (токены, `data-theme` dark/light/auto), `shared/theme.ts` (тогл темы, localStorage). Хедер `popup__header` (лого+тайтл слева, тогл темы + pin справа), `popup__body`, `popup__footer`. Бренд: оранжевый `#fe4622`, синий `#355ff5` (TG).
 - **Side panel:** один `popup.html?sidepanel=1` служит и popup, и боковой панелью. Chrome/Edge — `side_panel` + кнопка «pin» (открыть панель); Firefox — `sidebar_action`.
 
 ## Архитектурные решения (зафиксированы владельцем)
-- Доставка — **polling** (открыт popup: 2.5с; фон: alarm 1 мин + нотификации). Web Push — фаза 2.
+- Доставка — **умный polling** в открытом окне: быстрый 2.5с только в «окне ожидания» 60с (открытие/действие/новое письмо),
+  вне окна бэкофф 12с, пауза на скрытой вкладке. Фон: alarm 1 мин + нотификации. **Выбранный путь фазы 2 — Web Push**
+  (наработки `W:\Projects\fastweb-cam\workers\push-cdn`: Web Crypto RFC 8291 + VAPID, KV-подписки, без зависимостей).
 - Auth — **анонимный device-token** (без регистрации). Bearer = 32B base64url; сервер хранит только sha256-хеш.
 - Хранение — на сервере (D1, текст, TTL 24ч). Браузеры — Chrome/Edge/Firefox (WXT, единый `browser` API). Opera исключена (не принимает расширения).
 - API — на кастом-домене воркера **`api.mailbot.click`** (Custom Domain, CORS=*).
