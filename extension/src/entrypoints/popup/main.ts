@@ -184,8 +184,10 @@ function renderState(boxes: BoxDTO[], messages: MessageDTO[]): void {
 
 async function refresh(type: 'GET_STATE' | 'NEW_BOX' | 'EXTEND' | 'DELETE' | 'POLL', address?: string): Promise<void> {
   const res = await send(address ? ({ type, address } as never) : ({ type } as never));
-  if (res.ok) renderState(res.boxes, res.messages);
-  else $('#addr-meta').textContent = t('error');
+  if (res.ok) { renderState(res.boxes, res.messages); return; }
+  // Тихий ретрай для фонового POLL: не затираем валидное состояние одним сбоем сети.
+  // Ошибку показываем только на действиях пользователя (GET_STATE при старте / NEW/EXTEND/DELETE).
+  if (type !== 'POLL') $('#addr-meta').textContent = t('error');
 }
 
 $('#copy-addr').addEventListener('click', (e) => { if (current) copy(current.address, e.currentTarget as HTMLElement); });
