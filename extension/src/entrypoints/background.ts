@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
-import { session, getBoxes, createBox, extendBox, deleteBox, getMessages } from '@shared/api';
+import { session, getBoxes, createBox, extendBox, deleteBox, getMessages, pushSubscribe } from '@shared/api';
 import { lang, t } from '@shared/i18n';
-import { STORAGE, POLL_ALARM_NAME, POLL_ALARM_MIN } from '@shared/constants';
+import { STORAGE, VAPID_PUBLIC } from '@shared/constants';
 import type { Req, Res } from '@shared/protocol';
 
 // Кросс-браузерный action (MV3 chrome → action, MV2 firefox → browserAction).
@@ -33,25 +33,50 @@ async function withSession<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-// Фоновый опрос: новые письма → нотификация + badge. Курсор хранится локально.
-async function poll(): Promise<void> {
+// --- Web Push: подписка ---
+function urlB64ToU8(s: string): Uint8Array {
+  const pad = '='.repeat((4 - (s.length % 4)) % 4);
+  const b64 = (s + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+// Подписаться на push и зарегистрировать подписку на сервере (owner-scoped).
+// Firefox MV2 (фоновая страница) не имеет pushManager → тихо пропускаем (фолбэк — поллинг в попапе).
+async function ensurePush(): Promise<void> {
   try {
-    const cur = ((await browser.storage.local.get(STORAGE.cursor))[STORAGE.cursor] as string) || '';
-    const { messages, next_cursor } = await withSession(() => getMessages(cur));
-    if (!messages.length) return;
-    for (const m of messages) {
-      browser.notifications?.create(`mb-${m.id}`, {
-        type: 'basic',
-        // public/icon/* не входит в типизированный PublicPath WXT — каст (файл есть в рантайме).
-        iconUrl: (browser.runtime.getURL as (p: string) => string)('/icon/128.png'),
-        title: m.otp ? `${m.otp} · ${t('otp')}` : t('inbox'),
-        message: `${m.subject || ''} — ${m.from || ''}`.slice(0, 200),
+    const reg = (self as any).registration;
+    if (!reg?.pushManager) return;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToU8(VAPID_PUBLIC),
       });
     }
-    const unread = (((await browser.storage.local.get('mb_unread'))['mb_unread'] as number) || 0) + messages.length;
-    await browser.storage.local.set({ [STORAGE.cursor]: next_cursor, mb_unread: unread });
-    await setBadge(unread);
-  } catch { /* офлайн/нет сессии */ }
+    await withSession(() => pushSubscribe(sub.toJSON()));
+  } catch (e) {
+    console.error('push subscribe failed', e);
+  }
+}
+
+// Пришёл push (письмо/OTP): нотификация + badge + пинок открытому попапу на refresh.
+async function handlePush(data: any): Promise<void> {
+  const id = data?.id || String(Date.now());
+  await browser.notifications?.create(`mb-${id}`, {
+    type: 'basic',
+    // public/icon/* не входит в типизированный PublicPath WXT — каст (файл есть в рантайме).
+    iconUrl: (browser.runtime.getURL as (p: string) => string)('/icon/128.png'),
+    title: data?.otp ? `${data.otp} · ${t('otp')}` : t('inbox'),
+    message: `${data?.subject || ''} — ${data?.from || ''}`.slice(0, 200),
+  });
+  const unread = (((await browser.storage.local.get('mb_unread'))['mb_unread'] as number) || 0) + 1;
+  await browser.storage.local.set({ mb_unread: unread });
+  await setBadge(unread);
+  // Открытый попап/панель → мгновенно обновить (если закрыт — sendMessage отвергнется, игнор).
+  browser.runtime.sendMessage({ type: 'NEW_MAIL' }).catch(() => { /* нет получателя */ });
 }
 
 // Хаб для popup: любое действие → возвращаем свежее состояние и сбрасываем непрочитанное.
@@ -78,7 +103,7 @@ async function handle(msg: Req): Promise<Res> {
 export default defineBackground(() => {
   browser.runtime.onInstalled.addListener(async (details) => {
     await ensureSession();
-    await browser.alarms.create(POLL_ALARM_NAME, { periodInMinutes: POLL_ALARM_MIN });
+    await ensurePush();
     if (details.reason === 'install') {
       browser.tabs?.create({ url: browser.runtime.getURL('/welcome.html') });
     }
@@ -86,14 +111,20 @@ export default defineBackground(() => {
 
   browser.runtime.onStartup.addListener(async () => {
     await ensureSession();
-    await browser.alarms.create(POLL_ALARM_NAME, { periodInMinutes: POLL_ALARM_MIN });
+    await ensurePush();
   });
 
-  browser.alarms.onAlarm.addListener((a) => {
-    if (a.name === POLL_ALARM_NAME) void poll();
+  // Web Push — будит SW даже при закрытом расширении (заменяет фоновый alarm-поллинг).
+  const sw = self as any;
+  sw.addEventListener?.('push', (event: any) => {
+    let data: any = {};
+    try { data = event.data?.json() ?? {}; } catch { /* нет/битый payload */ }
+    event.waitUntil(handlePush(data));
+  });
+  sw.addEventListener?.('pushsubscriptionchange', (event: any) => {
+    event.waitUntil(ensurePush());
   });
 
-  // Клик по нотификации → открыть popup невозможно программно; открываем бот/попап-страницу не нужно.
   browser.notifications?.onClicked.addListener((id) => browser.notifications.clear(id));
 
   browser.runtime.onMessage.addListener(((message: unknown, _sender: unknown, sendResponse: (r: Res) => void) => {

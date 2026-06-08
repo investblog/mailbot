@@ -20,6 +20,9 @@ export interface ErrRes {
 }
 export type Res = StateRes | ErrRes;
 
+// Бродкаст background → popup: пришёл push о новом письме, попап должен обновиться.
+export type Broadcast = { type: 'NEW_MAIL' };
+
 export function send(msg: Req): Promise<Res> {
   return browser.runtime.sendMessage(msg) as Promise<Res>;
 }

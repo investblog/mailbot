@@ -22,9 +22,10 @@ export default defineConfig({
     homepage_url: 'https://mailbot.click',
 
     // Доступ только к нашему API (CORS на сервере = *). sidePanel — chrome/edge.
+    // notifications — для Web Push (будит SW) и баннеров. alarms убран: поллинг заменён push.
     permissions: browser === 'firefox'
-      ? ['storage', 'alarms', 'notifications']
-      : ['storage', 'alarms', 'notifications', 'sidePanel'],
+      ? ['storage', 'notifications']
+      : ['storage', 'notifications', 'sidePanel'],
     host_permissions: ['https://api.mailbot.click/*'],
 
     icons: {
