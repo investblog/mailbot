@@ -25,7 +25,8 @@
     { "binding": "DB", "database_name": "gotemail", "database_id": "399e1409-02c7-45f8-a0bd-47da37b2ed56" }
   ],
   "kv_namespaces": [
-    { "binding": "RL", "id": "99a6ced205984068809c8ac8e159e9ad" }
+    { "binding": "RL", "id": "99a6ced205984068809c8ac8e159e9ad" },
+    { "binding": "PUSH_SUBS", "id": "5e7355bbff454734b160f10b2871dccb" }
   ],
   "triggers": { "crons": ["0 * * * *"] },
 

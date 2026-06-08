@@ -10,6 +10,7 @@ import { ownerId as makeOwnerId, ensureOwner, getOwnerById } from './owners.js';
 import { activeBoxes, extendBox, deleteBox, provisionBox } from './boxes.js';
 import { listMessages, getMessage } from './messages.js';
 import { hitLimit } from './ratelimit.js';
+import { saveSubscription, deleteSubscription } from './push.js';
 
 const KIND = 'extension';
 const API_RL_PER_MIN = 120; // общий лимит запросов на токен
@@ -115,6 +116,20 @@ export async function handleApi(request, env, _ctx) {
         const ok = await deleteBox(env, oid, lp, dom);
         return ok ? json({ ok: true }) : json({ error: 'not found' }, 404);
       }
+    }
+  }
+
+  // --- /api/push --- (Web Push: подписка расширения, owner-scoped)
+  if (parts[1] === 'push' && request.method === 'POST') {
+    let body = {};
+    try { body = await request.json(); } catch { /* ignore */ }
+    if (parts[2] === 'subscribe' && parts.length === 3) {
+      const ok = await saveSubscription(env, oid, body);
+      return ok ? json({ ok: true }) : json({ error: 'bad subscription' }, 400);
+    }
+    if (parts[2] === 'unsubscribe' && parts.length === 3) {
+      await deleteSubscription(env, oid, body.endpoint);
+      return json({ ok: true });
     }
   }
 

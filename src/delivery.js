@@ -10,6 +10,7 @@ import { renderEmail } from './render.js';
 import { sendMessage } from './telegram.js';
 import { deleteBoxesForOwner } from './boxes.js';
 import { storeMessage } from './messages.js';
+import { pushToOwner } from './push.js';
 
 export async function deliver(env, ctx, owner, msg) {
   switch (owner.kind) {
@@ -17,7 +18,7 @@ export async function deliver(env, ctx, owner, msg) {
       return deliverTelegram(env, ctx, owner, msg);
     case 'extension':
     case 'account':
-      return deliverStore(env, owner, msg);
+      return deliverStore(env, ctx, owner, msg);
     default:
       console.error(`deliver: unsupported owner kind ${owner.kind}`);
       return { delivered: false, permanent: true };
@@ -26,13 +27,23 @@ export async function deliver(env, ctx, owner, msg) {
 
 // Клиенты, которые показывают письма сами: сохраняем нормализованное событие в D1 (TTL = жизнь адреса).
 // Расширение читает через GET /api/messages. msg.box = { localpart, domain, expires_at }.
-async function deliverStore(env, owner, msg) {
+async function deliverStore(env, ctx, owner, msg) {
   if (!msg.box) {
     console.error('deliverStore: msg.box missing');
     return { delivered: false, permanent: true };
   }
   try {
-    await storeMessage(env, owner, msg.box, msg);
+    const id = await storeMessage(env, owner, msg.box, msg);
+    // Web Push: будит SW расширения (нотификация + мгновенный refresh открытого попапа).
+    // Best-effort, вне критического пути доставки — не блокируем и не валим приём письма.
+    const payload = {
+      id,
+      address: `${msg.box.localpart}@${msg.box.domain}`,
+      from: msg.from || '',
+      subject: msg.subject || '',
+      otp: msg.otp || null,
+    };
+    ctx.waitUntil(pushToOwner(env, owner.id, payload));
     return { delivered: true };
   } catch (e) {
     console.error('deliverStore failed', e);

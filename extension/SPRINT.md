@@ -40,3 +40,31 @@
 - Юнит-тесты расширения не подключены (node strip-types + extensionless-импорты хрупки); верификация = tsc + wxt build + eslint.
   Логика escape/render зеркалит уже протестированный `src/render.js` бэкенда.
 - Автозаполнение OTP в активное поле (content-script), аккаунт поверх device-token, rewarded — фаза 3.
+
+---
+
+# Фаза 2 — Web Push (выбрано; Workers Paid куплен 2026-06-09)
+
+**Цель:** мгновенная доставка письма/OTP и в открытом, и в закрытом состоянии; убрать поллинг и минутный алярм.
+
+**Почему Web Push, а не DO/WebSocket:** разбудить уснувший SW умеет ТОЛЬКО push. DO+WebSocket не покрывает закрытое состояние (нет живого SW под сокет), а в открытом push→refresh достаточно. Подтверждено по докам: Push API работает в SW расширения (Chrome MV3 офиц. + Firefox), стандартный VAPID, push будит suspended SW. Payload шифруется E2E (RFC 8291) — FCM/Mozilla код не видят. Paid даёт запас по KV/лимитам и оставляет DO опцией на будущее (мульти-девайс/синк), но транспорт — Web Push.
+
+## Сервер (воркер `gotemailbot`)
+- `src/push.js` — порт логики из `W:\Projects\fastweb-cam\workers\push-cdn`: `sendPush(sub, payload)` на Web Crypto (RFC 8291 aes128gcm + RFC 8292 VAPID ES256 JWT), без внешних зависимостей.
+- KV namespace `PUSH_SUBS` (новый биндинг в `wrangler.jsonc`): подписки по owner, ключ `push:<oid>:<endpoint-hash>`, значение `{endpoint, keys:{p256dh, auth}}`. TTL не нужен.
+- Секрет `VAPID_PRIVATE_KEY`; public — константа (захардкодить в extension `constants.ts`, он публичный). Сгенерировать пару P-256.
+- `api.js` (owner-scoped, мутации → под rate-limit): `POST /api/push/subscribe` (тело PushSubscription → сохранить), `POST /api/push/unsubscribe` (по endpoint).
+- `delivery.js` `deliverStore`/`deliverExtension`: после записи письма в D1 — достать подписки owner, `ctx.waitUntil(sendPush(...))` с payload `{id, address, subject, from, otp}`. На 404/410 от push-сервиса — удалить протухшую подписку.
+
+## Клиент (`extension/`)
+- `background.ts`: после сессии — `pushManager.subscribe({userVisibleOnly:true, applicationServerKey: VAPID_PUBLIC})` → `POST /api/push/subscribe`; обработать `pushsubscriptionchange` (переподписка). Событие `push`: расшифровка → `chrome.notifications.create` (OTP в заголовке) + badge + broadcast runtime-сообщения в открытый попап → мгновенный refresh. **Минутный `alarms`-поллинг убрать** (push заменяет).
+- `popup/main.ts`: убрать быстрый/медленный поллинг-цикл. На открытие — один `GET_STATE`; слушать runtime-сообщение от SW → refresh; refresh на `visibilitychange`. Fallback (push не 100%): пока попап ОТКРЫТ — медленный safety-поллинг ~15с.
+- `notifications` permission уже в манифесте (в расширениях без промпта).
+
+## Открытые вопросы (решить по ходу)
+- **Firefox MV2**: нет service worker (фоновая страница) — push для расширений FF проверить отдельно (`browser.pushManager`/совместимость). Chrome/Edge — основной таргет; для FF возможен фолбэк-поллинг.
+- Судьба глубокого закрытого fallback: чистый push vs оставить 5-мин алярм страховкой.
+
+## Проверки
+- Сервер: юнит на endpoint-hash/формат payload; ручной `sendPush` на реальную подписку.
+- Клиент: tsc+build+lint; ручная — закрытый попап → письмо → нотификация ~мгновенно; открытый → строка без поллинга.
