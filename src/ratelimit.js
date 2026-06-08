@@ -8,11 +8,17 @@ export async function isDenied(env, from) {
 }
 
 // Инкремент счётчика с TTL. true = лимит исчерпан (не инкрементим сверх).
+// Fail-open: сбой KV (включая дневной лимит put на free-tier) НЕ должен ронять запрос —
+// лимитер деградирует мягко, иначе исчерпание квоты кладёт весь API (1101/500).
 export async function hitLimit(env, key, limit, ttlSeconds) {
-  const cur = Number((await env.RL.get(key)) || 0);
-  if (cur >= limit) return true;
-  await env.RL.put(key, String(cur + 1), { expirationTtl: ttlSeconds });
-  return false;
+  try {
+    const cur = Number((await env.RL.get(key)) || 0);
+    if (cur >= limit) return true;
+    await env.RL.put(key, String(cur + 1), { expirationTtl: ttlSeconds });
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 // Rate-limit входящих на конкретный адрес.
@@ -23,12 +29,16 @@ export function addressLimited(env, cfg, address) {
 // Rate-limit создания адресов на chat_id: и часовой, и суточный.
 // Читаем оба до инкремента, чтобы не «съесть» часовой лимит, когда уже упёрлись в суточный.
 export async function newBoxLimited(env, cfg, chatId) {
-  const hKey = `new:h:${chatId}`;
-  const dKey = `new:d:${chatId}`;
-  const h = Number((await env.RL.get(hKey)) || 0);
-  const d = Number((await env.RL.get(dKey)) || 0);
-  if (h >= cfg.newPerHour || d >= cfg.newPerDay) return true;
-  await env.RL.put(hKey, String(h + 1), { expirationTtl: 3600 });
-  await env.RL.put(dKey, String(d + 1), { expirationTtl: 86400 });
-  return false;
+  try {
+    const hKey = `new:h:${chatId}`;
+    const dKey = `new:d:${chatId}`;
+    const h = Number((await env.RL.get(hKey)) || 0);
+    const d = Number((await env.RL.get(dKey)) || 0);
+    if (h >= cfg.newPerHour || d >= cfg.newPerDay) return true;
+    await env.RL.put(hKey, String(h + 1), { expirationTtl: 3600 });
+    await env.RL.put(dKey, String(d + 1), { expirationTtl: 86400 });
+    return false;
+  } catch {
+    return false; // fail-open: см. hitLimit
+  }
 }

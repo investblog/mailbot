@@ -64,8 +64,10 @@ export async function handleApi(request, env, _ctx) {
   const hash = await sha256hex(secret);
   const oid = makeOwnerId(KIND, hash);
 
-  // Общий rate-limit на токен.
-  if (await hitLimit(env, `api:${oid}`, API_RL_PER_MIN, 60)) {
+  // Rate-limit на токен — только для мутаций. GET-поллинг (boxes/messages) идемпотентен и
+  // частый; если писать в KV на каждый GET, free-tier лимит (1000 put/день) выжигается и кладёт API.
+  if (request.method !== 'GET' && request.method !== 'OPTIONS' &&
+      await hitLimit(env, `api:${oid}`, API_RL_PER_MIN, 60)) {
     return json({ error: 'rate limited' }, 429);
   }
 
