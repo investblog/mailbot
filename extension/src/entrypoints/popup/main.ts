@@ -3,7 +3,7 @@ import { applyI18n, t, lang } from '@shared/i18n';
 import { initTheme, toggleTheme, getTheme } from '@shared/theme';
 import { send } from '@shared/protocol';
 import { renderBody } from '@shared/render';
-import { POLL_OPEN_MS } from '@shared/constants';
+import { POLL_FAST_MS, POLL_SLOW_MS, POLL_ACTIVE_MS } from '@shared/constants';
 import type { BoxDTO, MessageDTO } from '@shared/types';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -175,11 +175,17 @@ function renderMessages(messages: MessageDTO[]): void {
   }
 }
 
+let lastCount = -1;
+
 function renderState(boxes: BoxDTO[], messages: MessageDTO[]): void {
   current = boxes[0] || null;
   $('#addr').textContent = current ? current.address : '—';
   $('#addr-meta').textContent = current ? fmtExpiry(current) : '';
-  renderMessages(messages.filter((m) => !current || m.address === current.address));
+  const shown = messages.filter((m) => !current || m.address === current.address);
+  // Пришло новое письмо → продлеваем «окно ожидания» (вдруг прилетит ещё код).
+  if (lastCount >= 0 && shown.length > lastCount) bumpActive();
+  lastCount = shown.length;
+  renderMessages(shown);
 }
 
 async function refresh(type: 'GET_STATE' | 'NEW_BOX' | 'EXTEND' | 'DELETE' | 'POLL', address?: string): Promise<void> {
@@ -190,12 +196,42 @@ async function refresh(type: 'GET_STATE' | 'NEW_BOX' | 'EXTEND' | 'DELETE' | 'PO
   if (type !== 'POLL') $('#addr-meta').textContent = t('error');
 }
 
+// --- умный поллинг: быстрый темп в «окне ожидания», бэкофф вне его, пауза на hidden ---
+let activeUntil = 0;
+let pollTimer: ReturnType<typeof setTimeout> | undefined;
+
+function bumpActive(): void { activeUntil = Date.now() + POLL_ACTIVE_MS; }
+
+function scheduleNext(): void {
+  clearTimeout(pollTimer);
+  if (document.hidden) return; // вкладка скрыта → не опрашиваем
+  const delay = Date.now() < activeUntil ? POLL_FAST_MS : POLL_SLOW_MS;
+  pollTimer = setTimeout(() => void tick(), delay);
+}
+
+async function tick(): Promise<void> {
+  await refresh('POLL');
+  scheduleNext();
+}
+
+// Действие пользователя → свежее состояние + переход в быстрый темп.
+async function userAction(type: 'NEW_BOX' | 'EXTEND' | 'DELETE', address?: string): Promise<void> {
+  await refresh(type, address);
+  bumpActive();
+  scheduleNext();
+}
+
 $('#copy-addr').addEventListener('click', (e) => { if (current) copy(current.address, e.currentTarget as HTMLElement); });
 $('#addr').addEventListener('click', () => { if (current) copy(current.address, $('#copy-addr')); });
-$('#new').addEventListener('click', () => refresh('NEW_BOX'));
-$('#extend').addEventListener('click', () => { if (current) refresh('EXTEND', current.address); });
-$('#delete').addEventListener('click', () => { if (current) refresh('DELETE', current.address); });
+$('#new').addEventListener('click', () => void userAction('NEW_BOX'));
+$('#extend').addEventListener('click', () => { if (current) void userAction('EXTEND', current.address); });
+$('#delete').addEventListener('click', () => { if (current) void userAction('DELETE', current.address); });
 
-void refresh('GET_STATE');
-const pollTimer = setInterval(() => void refresh('POLL'), POLL_OPEN_MS) as unknown as number;
-window.addEventListener('unload', () => clearInterval(pollTimer));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearTimeout(pollTimer);
+  else { bumpActive(); void tick(); } // вернулись на вкладку → опрос сразу + быстрый темп
+});
+window.addEventListener('unload', () => clearTimeout(pollTimer));
+
+bumpActive();
+void (async () => { await refresh('GET_STATE'); scheduleNext(); })();
