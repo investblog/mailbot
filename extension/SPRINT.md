@@ -32,7 +32,7 @@
 
 ## Известные ограничения / TODO (обсудить утром)
 - API на `api.mailbot.click` (Custom Domain воркера) — готово.
-- Иконки — из лого-маскота (та же, что в лендинге).
+- Иконки — бот-фейс из `icon-source.png`, нарезка `npm run icons` → `src/public/icon/` (WXT копирует public ИЗ `src/public/`, не из корня!).
 - Юнит-тесты расширения не подключены (node strip-types + extensionless-импорты хрупки); верификация = tsc + wxt build + eslint.
   Логика escape/render зеркалит уже протестированный `src/render.js` бэкенда.
 - Автозаполнение OTP в активное поле (content-script), аккаунт поверх device-token, rewarded — фаза 3.
