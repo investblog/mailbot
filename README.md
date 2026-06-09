@@ -46,12 +46,11 @@ src/            email-core + Telegram client + extension API (Cloudflare Worker)
   api.js          /api/* for the browser extension (device-token auth)
   render.js       Telegram message builder
   strings.js      i18n (ru/en)
+  push.js         Web Push (RFC 8291/8292) — wakes the extension SW
 test/           node:test suites
-landing/        Vite MPA landing (Cloudflare Pages), RU + EN
-extension/      browser extension (WXT, Chrome/Edge + Firefox) — popup inbox
+extension/      browser extension (WXT, Chrome/Edge + Firefox) — popup/side-panel inbox
 schema.sql      D1 schema (owners + boxes + messages)
 SPEC.md         technical specification
-cloudflare.md   infrastructure & deploy runbook
 ```
 
 ## Clients
@@ -59,7 +58,7 @@ cloudflare.md   infrastructure & deploy runbook
 Two clients sit on one client-agnostic **email-core** (owner abstraction + `deliver(owner,msg)` seam):
 
 - **Telegram bot** ([@gotemailbot](https://t.me/gotemailbot)) — delivers to chat, **stores nothing**.
-- **Browser extension** (`extension/`, WXT) — popup inbox with OTP detection. Anonymous device-token auth; incoming events are stored server-side in D1 (text only, 24h TTL) so the extension can display them. Polls the `/api/*` endpoints.
+- **Browser extension** (`extension/`, WXT) — popup/side-panel inbox with OTP detection. Anonymous device-token auth; incoming events are stored server-side in D1 (text only, 24h TTL). Real-time delivery via **Web Push** (Chrome/Edge) with an alarm-poll fallback (Firefox). _Chrome / Edge / Firefox builds are being submitted to the stores — listings coming soon._
 
 ## Development
 
@@ -67,27 +66,28 @@ Two clients sit on one client-agnostic **email-core** (owner abstraction + `deli
 git clone https://github.com/investblog/mailbot.git
 cd mailbot
 
-# Worker (email-core + bot)
+# Worker (email-core + bot + extension API)
 npm install
-npm test          # node --test (otp/normalize/render/ratelimit/boxes/delivery/strings)
+npm test          # node --test (otp/normalize/render/ratelimit/boxes/delivery/push/strings)
 npm run lint      # ESLint
 npm run check     # lint + test + wrangler dry-run
 
-# Landing (RU + EN)
-cd landing
+# Browser extension (WXT)
+cd extension
 npm install
-npm run build     # EN at /, RU at /ru/
-npm run build:ru  # RU at root (for emailbot.ru)
+npm run check     # typecheck + lint + build (chrome + firefox)
+npm run zip:all   # packaged zips for the stores
 ```
 
-Deploy and infrastructure details (D1/KV, Email Routing, secrets, scopes): [cloudflare.md](cloudflare.md).
+Deploy/infrastructure (D1/KV, Email Routing, secrets) is described in [SPEC.md](SPEC.md) and `wrangler.jsonc`. Releases are built and packaged by CI on a `v*` tag (see `.github/workflows/release.yml`).
 
 ## Tech stack
 
 - **Cloudflare Workers** — `email()` + `fetch()` + `scheduled()`, `nodejs_compat`
 - **D1** (SQLite) — owners + addresses · **KV** — rate-limit/denylist · **Cron** — cleanup
 - **[PostalMime](https://github.com/postalsys/postal-mime)** — MIME parsing · `HTMLRewriter` — HTML→text
-- **Landing:** Vite + vanilla TS, design system from [301-ui](https://301.st), Cloudflare Pages
+- **Web Push** — RFC 8291 (aes128gcm) + RFC 8292 (VAPID) on Web Crypto, no deps
+- **Extension:** [WXT](https://wxt.dev) (Chrome/Edge MV3 + Firefox MV2), vanilla TS
 - Telegram Bot API over plain `fetch()` — no SMTP, no external services
 
 ## Privacy

@@ -1,0 +1,41 @@
+name: Release
+
+# По тегу v* собирает расширение и публикует GitHub Release с zip'ами под каждый
+# браузер (chrome/edge/firefox + sources). Секреты не нужны — это сборка артефактов;
+# авто-публикация в сторы — отдельный submit.yml (после первой ручной публикации листинга).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: extension # расширение лежит в подкаталоге (монорепо: воркер + extension)
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run zip:all
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: | # пути относительно корня репо (не зависят от defaults working-directory)
+            extension/dist/*-chrome.zip
+            extension/dist/*-edge.zip
+            extension/dist/*-firefox.zip
+            extension/dist/*-sources.zip
