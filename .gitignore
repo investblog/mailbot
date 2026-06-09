@@ -26,6 +26,14 @@ CLAUDE.local.md
 .aider*
 .mcp.json
 
+# --- не для публичного репо: маркетинг-сайт, черновики, ops/внутренние заметки ---
+# (деплой лендинга — через CF Pages без git-связи; файлы остаются локально)
+landing/
+temp/
+cloudflare.md
+gotemailbot-tz.md
+extension/SPRINT.md
+
 # --- редакторы / IDE ---
 .vscode/
 .idea/

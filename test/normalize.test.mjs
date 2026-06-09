@@ -24,7 +24,7 @@ test('Anthropic/Stripe receipt forward: чистка + ссылки', () => {
     'From: Anthropic <receipts@anthropic.com>',
     'Date: Mon, 2 Jun 2026 10:00:00 +0000',
     'Subject: Your receipt from Anthropic',
-    'To: investblog.io@gmail.com',
+    'To: user@example.com',
     '',
     '​Receipt from Anthropic­',
     '',
@@ -57,7 +57,7 @@ test('Anthropic/Stripe receipt forward: чистка + ссылки', () => {
   assert.ok(!linkByHrefIncludes(tokens, 'illustration.png'), 'illustration не дропнут');
   assert.ok(!linkByHrefIncludes(tokens, 'logo.png'), 'logo не дропнут');
 
-  const out = renderEmail({ from: 'investblog.io@gmail.com', subject: 'Fwd: receipt', bodyTokens: tokens, attachments: ['invoice.pdf'] });
+  const out = renderEmail({ from: 'user@example.com', subject: 'Fwd: receipt', bodyTokens: tokens, attachments: ['invoice.pdf'] });
   assertSafe(out);
   assert.match(out, /<a href="https:\/\/pay\.stripe\.com\/invoice\/abc\/pdf">/);
   assert.match(out, /📎 invoice\.pdf/);
@@ -72,11 +72,11 @@ test('Cloudflare login token forward: OTP + ссылки + footer', () => {
     'From: Cloudflare <noreply@notify.cloudflare.com>',
     'Date: Mon, 2 Jun 2026 09:00:00 +0000',
     'Subject: Your Cloudflare login token: 7064094',
-    'To: investblog.io@gmail.com',
+    'To: user@example.com',
     '',
     '*Your Cloudflare login token*',
     '',
-    'A new login attempt was made to access the Cloudflare account for investblog.io@gmail.com.',
+    'A new login attempt was made to access the Cloudflare account for user@example.com.',
     '',
     'Was this you? Enter this token on the challenge page:',
     '',
@@ -108,7 +108,7 @@ test('Cloudflare login token forward: OTP + ссылки + footer', () => {
     assert.ok(labels.includes(l), `нет чистой footer-метки: ${l}`);
   }
 
-  const out = renderEmail({ from: 'investblog.io@gmail.com', subject, bodyTokens: tokens, otp: '7064094' });
+  const out = renderEmail({ from: 'user@example.com', subject, bodyTokens: tokens, otp: '7064094' });
   assertSafe(out);
   assert.ok(out.startsWith('🔑 <b>7064094</b>'));
   assert.match(out, /<a href="https:\/\/dash\.cloudflare\.com\/profile">/);
