@@ -22,8 +22,32 @@ function updateThemeIcon(): void {
 updateThemeIcon();
 $('#theme-toggle').addEventListener('click', () => { toggleTheme(); updateThemeIcon(); });
 
-// --- panel toggle: попап → открыть боковую панель; панель → свернуть её ---
+// --- side panel: попап разворачивает докнутую панель (chrome) / сайдбар (firefox); панель → сворачивает себя ---
 const sidePanel = (browser as { sidePanel?: { open(opts: { windowId?: number }): Promise<void> } }).sidePanel;
+const sidebarAction = (browser as { sidebarAction?: { open(): Promise<void> } }).sidebarAction;
+const canOpenPanel = !isSidepanel && (!!sidePanel?.open || !!sidebarAction?.open);
+
+// windowId кэшируем заранее: sidePanel.open() требует user-gesture, а `await` ПЕРЕД ним
+// «съедает» жест (Chrome) → open молча отклоняется. С кэшем зовём open синхронно в обработчике.
+let curWindowId: number | undefined;
+if (canOpenPanel && sidePanel?.open) browser.windows.getCurrent().then((w) => { curWindowId = w.id; }).catch(() => { /* ignore */ });
+
+function openSidePanel(): void {
+  if (sidePanel?.open) { // chrome/edge
+    if (curWindowId != null) {
+      try { void sidePanel.open({ windowId: curWindowId }); window.close(); } catch { /* ignore */ }
+    } else {
+      // windowId ещё не закэширован (редко) — фолбэк с await; жест может потеряться.
+      browser.windows.getCurrent()
+        .then((w) => sidePanel.open({ windowId: w.id }))
+        .then(() => window.close())
+        .catch(() => { /* ignore */ });
+    }
+  } else if (sidebarAction?.open) { // firefox
+    try { void sidebarAction.open(); window.close(); } catch { /* ignore */ }
+  }
+}
+
 const pin = $('#pin');
 if (isSidepanel) {
   // уже в панели — кнопка её сворачивает (закрытие страницы панели = collapse)
@@ -32,16 +56,9 @@ if (isSidepanel) {
   pin.title = t('collapse');
   pin.setAttribute('aria-label', t('collapse'));
   pin.addEventListener('click', () => window.close());
-} else if (sidePanel?.open) {
-  // в попапе — кнопка разворачивает докнутую панель
+} else if (canOpenPanel) {
   pin.hidden = false;
-  pin.addEventListener('click', async () => {
-    try {
-      const w = await browser.windows.getCurrent();
-      await sidePanel.open({ windowId: w.id });
-      window.close();
-    } catch { /* ignore */ }
-  });
+  pin.addEventListener('click', openSidePanel);
 }
 
 // --- copy с success-фидбеком (house) ---
@@ -85,13 +102,32 @@ function openDrawer(m: MessageDTO): void {
   const title = document.createElement('h2');
   title.className = 'drawer__title';
   title.textContent = m.subject || '(no subject)';
+  const actions = document.createElement('div');
+  actions.className = 'drawer__actions';
+
+  // В попапе — кнопка «открыть это письмо в боковой панели» (комфортнее читать).
+  if (canOpenPanel) {
+    const expand = document.createElement('button');
+    expand.className = 'drawer__close';
+    expand.type = 'button';
+    expand.title = t('pin');
+    expand.setAttribute('aria-label', t('pin'));
+    expand.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-panel-open"></use></svg>';
+    expand.addEventListener('click', () => {
+      void browser.storage.local.set({ mb_open_msg: m.id }); // панель откроет это же письмо
+      openSidePanel();
+    });
+    actions.appendChild(expand);
+  }
+
   const closeBtn = document.createElement('button');
   closeBtn.className = 'drawer__close';
   closeBtn.type = 'button';
   closeBtn.title = t('close');
   closeBtn.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-close"></use></svg>';
   closeBtn.addEventListener('click', close);
-  header.append(title, closeBtn);
+  actions.appendChild(closeBtn);
+  header.append(title, actions);
 
   const body = document.createElement('div');
   body.className = 'drawer__body';
@@ -183,12 +219,25 @@ function renderMessages(messages: MessageDTO[]): void {
   }
 }
 
+let lastMessages: MessageDTO[] = [];
+
 function renderState(boxes: BoxDTO[], messages: MessageDTO[]): void {
   current = boxes[0] || null;
   $('#addr').textContent = current ? current.address : '—';
   $('#addr-meta').textContent = current ? fmtExpiry(current) : '';
   const shown = messages.filter((m) => !current || m.address === current.address);
+  lastMessages = shown;
   renderMessages(shown);
+}
+
+// Открыли письмо в панели из дровера попапа → панель при загрузке открывает его же.
+async function maybeOpenDeepLink(): Promise<void> {
+  if (!isSidepanel) return;
+  const id = (await browser.storage.local.get('mb_open_msg')).mb_open_msg as string | undefined;
+  if (!id) return;
+  await browser.storage.local.remove('mb_open_msg');
+  const m = lastMessages.find((x) => x.id === id);
+  if (m) openDrawer(m);
 }
 
 async function refresh(type: 'GET_STATE' | 'NEW_BOX' | 'EXTEND' | 'DELETE' | 'POLL', address?: string): Promise<void> {
@@ -232,4 +281,4 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('unload', () => clearTimeout(pollTimer));
 
-void (async () => { await refresh('GET_STATE'); scheduleFallback(); })();
+void (async () => { await refresh('GET_STATE'); await maybeOpenDeepLink(); scheduleFallback(); })();

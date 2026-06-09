@@ -112,6 +112,7 @@ body.sidepanel { width: 100%; height: 100vh; max-height: none; }
   padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
 }
 .drawer__title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); margin: 0; word-break: break-word; }
+.drawer__actions { display: flex; gap: var(--space-1); align-items: center; flex-shrink: 0; }
 .drawer__close {
   display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
   border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: var(--radius); flex-shrink: 0;
