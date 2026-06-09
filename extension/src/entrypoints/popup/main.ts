@@ -181,6 +181,70 @@ function openDrawer(m: MessageDTO): void {
   document.addEventListener('keydown', onKey);
 }
 
+// --- confirm dialog (стиль оригинального 301-ui .dialog) ---
+function confirmDialog(opts: {
+  title: string; message: string; emphasis?: string;
+  confirm: string; cancel: string; variant?: 'warning' | 'danger' | 'info';
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('div');
+    dlg.className = `dialog${opts.variant ? ` dialog--${opts.variant}` : ''}`;
+    const done = (v: boolean): void => {
+      dlg.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(v);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') done(false);
+      else if (e.key === 'Enter') done(true);
+    };
+
+    const overlay = document.createElement('div');
+    overlay.className = 'dialog__overlay';
+    overlay.addEventListener('click', () => done(false));
+
+    const panel = document.createElement('div');
+    panel.className = 'dialog__panel';
+
+    const header = document.createElement('div');
+    header.className = 'dialog__header';
+    const title = document.createElement('h2');
+    title.className = 'dialog__title';
+    title.textContent = opts.title;
+    header.appendChild(title);
+
+    const body = document.createElement('div');
+    body.className = 'dialog__body';
+    body.textContent = opts.message;
+    if (opts.emphasis) {
+      body.appendChild(document.createElement('br'));
+      const strong = document.createElement('strong');
+      strong.textContent = opts.emphasis;
+      body.appendChild(strong);
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'dialog__footer';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn';
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = opts.cancel;
+    cancelBtn.addEventListener('click', () => done(false));
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn btn--tg';
+    okBtn.type = 'button';
+    okBtn.textContent = opts.confirm;
+    okBtn.addEventListener('click', () => done(true));
+    footer.append(cancelBtn, okBtn);
+
+    panel.append(header, body, footer);
+    dlg.append(overlay, panel);
+    document.body.appendChild(dlg);
+    document.addEventListener('keydown', onKey);
+    okBtn.focus();
+  });
+}
+
 // --- inbox ---
 let current: BoxDTO | null = null;
 
@@ -287,7 +351,22 @@ browser.runtime.onMessage.addListener(((msg: { type?: string }) => {
 
 $('#copy-addr').addEventListener('click', (e) => { if (current) copy(current.address, e.currentTarget as HTMLElement); });
 $('#addr').addEventListener('click', () => { if (current) copy(current.address, $('#copy-addr')); });
-$('#new').addEventListener('click', () => void userAction('NEW_BOX'));
+$('#new').addEventListener('click', () => {
+  // Новый адрес вытесняет текущий из UI (старый с его кодами больше не показывается) → предупреждаем.
+  if (!current) { void userAction('NEW_BOX'); return; }
+  const addr = current.address;
+  void (async () => {
+    const ok = await confirmDialog({
+      title: t('newConfirmTitle'),
+      message: t('newConfirmBody'),
+      emphasis: addr,
+      confirm: t('new'),
+      cancel: t('cancel'),
+      variant: 'warning',
+    });
+    if (ok) void userAction('NEW_BOX');
+  })();
+});
 $('#extend').addEventListener('click', () => { if (current) void userAction('EXTEND', current.address); });
 $('#delete').addEventListener('click', () => { if (current) void userAction('DELETE', current.address); });
 
