@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import { session, getBoxes, createBox, extendBox, deleteBox, getMessages, pushSubscribe } from '@shared/api';
 import { lang, t } from '@shared/i18n';
-import { STORAGE, VAPID_PUBLIC } from '@shared/constants';
+import { STORAGE, VAPID_PUBLIC, POLL_ALARM_NAME, POLL_ALARM_MIN } from '@shared/constants';
 import type { Req, Res } from '@shared/protocol';
 
 // Кросс-браузерный action (MV3 chrome → action, MV2 firefox → browserAction).
@@ -79,6 +79,28 @@ async function handlePush(data: any): Promise<void> {
   browser.runtime.sendMessage({ type: 'NEW_MAIL' }).catch(() => { /* нет получателя */ });
 }
 
+// Firefox-фолбэк (Web Push в FF-расширении невозможен — нет SW): фоновый alarm-поллинг.
+// Будит персистентный фон, забирает новые письма по курсору → нотификация + badge + storage;
+// открытый попап потом заберёт состояние. Chrome это не использует (там push).
+async function poll(): Promise<void> {
+  try {
+    const cur = ((await browser.storage.local.get(STORAGE.cursor))[STORAGE.cursor] as string) || '';
+    const { messages, next_cursor } = await withSession(() => getMessages(cur));
+    if (!messages.length) return;
+    for (const m of messages) {
+      browser.notifications?.create(`mb-${m.id}`, {
+        type: 'basic',
+        iconUrl: (browser.runtime.getURL as (p: string) => string)('/icon/128.png'),
+        title: m.otp ? `${m.otp} · ${t('otp')}` : t('inbox'),
+        message: `${m.subject || ''} — ${m.from || ''}`.slice(0, 200),
+      });
+    }
+    const unread = (((await browser.storage.local.get('mb_unread'))['mb_unread'] as number) || 0) + messages.length;
+    await browser.storage.local.set({ [STORAGE.cursor]: next_cursor, mb_unread: unread });
+    await setBadge(unread);
+  } catch { /* офлайн/нет сессии */ }
+}
+
 // Хаб для popup: любое действие → возвращаем свежее состояние и сбрасываем непрочитанное.
 async function handle(msg: Req): Promise<Res> {
   try {
@@ -100,10 +122,14 @@ async function handle(msg: Req): Promise<Res> {
   }
 }
 
+// Firefox не умеет push в расширении → closed-state на alarm-поллинге; Chrome — на push.
+const IS_FIREFOX = import.meta.env.FIREFOX;
+
 export default defineBackground(() => {
   browser.runtime.onInstalled.addListener(async (details) => {
     await ensureSession();
     await ensurePush();
+    if (IS_FIREFOX) await browser.alarms.create(POLL_ALARM_NAME, { periodInMinutes: POLL_ALARM_MIN });
     if (details.reason === 'install') {
       browser.tabs?.create({ url: browser.runtime.getURL('/welcome.html') });
     }
@@ -112,9 +138,15 @@ export default defineBackground(() => {
   browser.runtime.onStartup.addListener(async () => {
     await ensureSession();
     await ensurePush();
+    if (IS_FIREFOX) await browser.alarms.create(POLL_ALARM_NAME, { periodInMinutes: POLL_ALARM_MIN });
   });
 
-  // Web Push — будит SW даже при закрытом расширении (заменяет фоновый alarm-поллинг).
+  // Firefox closed-state: фоновый alarm-поллинг (push недоступен).
+  if (IS_FIREFOX) {
+    browser.alarms.onAlarm.addListener((a) => { if (a.name === POLL_ALARM_NAME) void poll(); });
+  }
+
+  // Chrome/Edge: Web Push будит SW даже при закрытом расширении.
   const sw = self as any;
   sw.addEventListener?.('push', (event: any) => {
     let data: any = {};
