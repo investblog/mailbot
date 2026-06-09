@@ -33,7 +33,8 @@ temp/
 cloudflare.md
 gotemailbot-tz.md
 extension/SPRINT.md
-extension/store/   # материалы листингов сторов (тексты/переводы/чек-лист) — локально
+# материалы листингов сторов (тексты/переводы/privacy/чек-лист) — локально
+extension/store/
 
 # --- редакторы / IDE ---
 .vscode/
