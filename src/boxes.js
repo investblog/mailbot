@@ -65,6 +65,7 @@ export async function activeBoxes(env, ownerId) {
 }
 
 // Удержать лимит активных: сносим самые старые сверх (maxActive - 1), освобождая место под новый.
+// Возвращает адреса отключённых ящиков (для уведомления клиента).
 export async function enforceActiveLimit(env, ownerId, maxActive) {
   const boxes = await activeBoxes(env, ownerId);
   const keep = Math.max(0, maxActive - 1);
@@ -73,6 +74,7 @@ export async function enforceActiveLimit(env, ownerId, maxActive) {
     await env.DB.prepare('DELETE FROM boxes WHERE localpart = ? AND domain = ?')
       .bind(b.localpart, b.domain).run();
   }
+  return drop.map((b) => `${b.localpart}@${b.domain}`);
 }
 
 // Снести все адреса владельца (напр. клиент недоступен — доставка невозможна).
@@ -101,9 +103,10 @@ export async function extendBox(env, ownerId, localpart, domain, ttlHours) {
 // Возвращает box, либо null если упёрлись в rate-limit на создание.
 export async function provisionBox(env, cfg, owner, locale) {
   if (await newBoxLimited(env, cfg, owner.id)) return null;
-  await enforceActiveLimit(env, owner.id, cfg.maxActive);
+  const evicted = await enforceActiveLimit(env, owner.id, cfg.maxActive);
   const domain = pickDomain(cfg.domains, locale);
   const box = await createBox(env, owner.id, domain, cfg.ttlHours);
   await incOwner(env, owner.id, 'boxes_total');
+  box.evicted = evicted; // адреса, отключённые лимитом (клиент может предупредить)
   return box;
 }

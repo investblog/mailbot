@@ -16,9 +16,19 @@ function kb(s) {
   ]);
 }
 
-function fmtAddress(s, address, expiresAt) {
+function fmtAddress(s, address, expiresAt, max) {
   const hours = Math.max(0, Math.round((expiresAt - Date.now() / 1000) / 3600));
-  return fmt(s.address, { addr: esc(address), h: hours });
+  return fmt(s.address, { addr: esc(address), h: hours, max });
+}
+
+// Сообщение о созданном адресе + предупреждение об адресах, отключённых лимитом.
+function fmtNewBox(s, cfg, box) {
+  let text = fmtAddress(s, box.address, box.expires_at, cfg.maxActive);
+  if (box.evicted?.length) {
+    const list = box.evicted.map((a) => `<code>${esc(a)}</code>`).join(', ');
+    text += '\n\n' + fmt(s.evicted, { addr: list, max: cfg.maxActive });
+  }
+  return text;
 }
 
 // Создаёт адрес для владельца (общая core-логика). null если упёрлись в rate-limit на /new.
@@ -42,18 +52,18 @@ async function handleMessage(msg, env, cfg) {
     const active = await activeBoxes(env, owner.id);
     if (active.length) {
       const b = active[0];
-      return sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, b.expires_at), kb(s));
+      return sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, b.expires_at, cfg.maxActive), kb(s));
     }
     const box = await newAddress(env, cfg, owner, locale);
     if (!box) return sendMessage(env, chatId, s.rlMsg, kb(s));
-    return sendMessage(env, chatId, fmtAddress(s, box.address, box.expires_at), kb(s));
+    return sendMessage(env, chatId, fmtNewBox(s, cfg, box), kb(s));
   }
 
   if (text.startsWith('/new')) {
     const owner = await ensureOwner(env, KIND, chatId, locale); // без +session
     const box = await newAddress(env, cfg, owner, locale);
     if (!box) return sendMessage(env, chatId, s.rlMsg, kb(s));
-    return sendMessage(env, chatId, fmtAddress(s, box.address, box.expires_at), kb(s));
+    return sendMessage(env, chatId, fmtNewBox(s, cfg, box), kb(s));
   }
 
   if (text.startsWith('/help')) return sendMessage(env, chatId, s.help, kb(s));
@@ -75,7 +85,7 @@ async function handleCallback(cq, env, cfg) {
       await sendMessage(env, chatId, s.rlMsg, kb(s));
       return answerCallback(env, cq.id, s.limit);
     }
-    await sendMessage(env, chatId, fmtAddress(s, box.address, box.expires_at), kb(s));
+    await sendMessage(env, chatId, fmtNewBox(s, cfg, box), kb(s));
     return answerCallback(env, cq.id, s.okNew);
   }
 
@@ -88,7 +98,7 @@ async function handleCallback(cq, env, cfg) {
     }
     const b = active[0];
     const exp = await extendBox(env, owner.id, b.localpart, b.domain, cfg.ttlHours);
-    await sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, exp || b.expires_at), kb(s));
+    await sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, exp || b.expires_at, cfg.maxActive), kb(s));
     return answerCallback(env, cq.id, s.okExtend);
   }
 

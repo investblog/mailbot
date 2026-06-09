@@ -59,10 +59,11 @@ test('enforceActiveLimit сносит самые старые сверх лим�
   await insertBox(env, 'a', 'mailbot.click', 'tg:1', 100);
   await insertBox(env, 'b', 'mailbot.click', 'tg:1', 200);
   await insertBox(env, 'c', 'mailbot.click', 'tg:1', 300); // самый новый
-  await enforceActiveLimit(env, 'tg:1', 2);   // keep = maxActive-1 = 1
+  const dropped = await enforceActiveLimit(env, 'tg:1', 2);   // keep = maxActive-1 = 1
   const left = await activeBoxes(env, 'tg:1');
   assert.equal(left.length, 1);
   assert.equal(left[0].localpart, 'c');
+  assert.deepEqual(dropped, ['b@mailbot.click', 'a@mailbot.click']); // отключённые: новые→старые
 });
 
 test('extendBox двигает expires_at вперёд (owner-scoped)', async () => {

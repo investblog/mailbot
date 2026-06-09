@@ -9,7 +9,8 @@ const S = {
   ru: {
     btnNew: 'Новый адрес', btnExtend: 'Продлить', btnHelp: 'Помощь',
     rlMsg: 'Слишком часто. Лимит новых адресов исчерпан — попробуй позже.',
-    address: 'Адрес: <code>{addr}</code>\nЖивёт ~{h} ч. Всё, что придёт, прилетит прямо в этот чат.',
+    address: 'Адрес: <code>{addr}</code>\nЖивёт ~{h} ч. Всё, что придёт, прилетит прямо в этот чат.\nАктивно до {max} адресов разом — новый сверх лимита отключит самый старый.',
+    evicted: '⚠️ Отключён прежний адрес (лимит {max}): {addr} — письма на него больше не дойдут.',
     cmds: 'Команды: /start · /new · /help',
     okNew: 'Готово', okExtend: 'Продлено', limit: 'Лимит',
     noActive: 'Активных адресов нет. /new — создать.',
@@ -26,7 +27,8 @@ const S = {
   en: {
     btnNew: 'New address', btnExtend: 'Extend', btnHelp: 'Help',
     rlMsg: 'Too often. New-address limit reached — try again later.',
-    address: 'Address: <code>{addr}</code>\nLives ~{h}h. Everything sent here lands in this chat.',
+    address: 'Address: <code>{addr}</code>\nLives ~{h}h. Everything sent here lands in this chat.\nUp to {max} addresses at once — a new one past the limit drops the oldest.',
+    evicted: '⚠️ Previous address deactivated (limit {max}): {addr} — mail to it won’t arrive anymore.',
     cmds: 'Commands: /start · /new · /help',
     okNew: 'Done', okExtend: 'Extended', limit: 'Limit',
     noActive: 'No active addresses. /new to create one.',
