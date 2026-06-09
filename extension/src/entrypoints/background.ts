@@ -2,17 +2,8 @@ import { browser } from 'wxt/browser';
 import { session, getBoxes, createBox, extendBox, deleteBox, getMessages, pushSubscribe } from '@shared/api';
 import { lang, t } from '@shared/i18n';
 import { STORAGE, VAPID_PUBLIC, POLL_ALARM_NAME, POLL_ALARM_MIN } from '@shared/constants';
+import { setBadgeCount, flashBadge } from '@shared/badge';
 import type { Req, Res } from '@shared/protocol';
-
-// Кросс-браузерный action (MV3 chrome → action, MV2 firefox → browserAction).
-const action = (browser as any).action ?? (browser as any).browserAction;
-
-async function setBadge(n: number): Promise<void> {
-  try {
-    await action?.setBadgeText?.({ text: n > 0 ? String(n) : '' });
-    await action?.setBadgeBackgroundColor?.({ color: '#fe4622' });
-  } catch { /* no-op */ }
-}
 
 // Гарантировать сессию (owner создаётся из device-token на сервере).
 async function ensureSession(): Promise<void> {
@@ -74,7 +65,8 @@ async function handlePush(data: any): Promise<void> {
   });
   const unread = (((await browser.storage.local.get('mb_unread'))['mb_unread'] as number) || 0) + 1;
   await browser.storage.local.set({ mb_unread: unread });
-  await setBadge(unread);
+  await setBadgeCount(unread);
+  flashBadge();
   // Открытый попап/панель → мгновенно обновить (если закрыт — sendMessage отвергнется, игнор).
   browser.runtime.sendMessage({ type: 'NEW_MAIL' }).catch(() => { /* нет получателя */ });
 }
@@ -97,7 +89,8 @@ async function poll(): Promise<void> {
     }
     const unread = (((await browser.storage.local.get('mb_unread'))['mb_unread'] as number) || 0) + messages.length;
     await browser.storage.local.set({ [STORAGE.cursor]: next_cursor, mb_unread: unread });
-    await setBadge(unread);
+    await setBadgeCount(unread);
+    flashBadge();
   } catch { /* офлайн/нет сессии */ }
 }
 
@@ -115,7 +108,7 @@ async function handle(msg: Req): Promise<Res> {
     });
     // popup открыт → всё прочитано: сбрасываем badge и двигаем курсор в конец.
     await browser.storage.local.set({ mb_unread: 0, [STORAGE.cursor]: next_cursor });
-    await setBadge(0);
+    await setBadgeCount(0);
     return { ok: true, boxes, messages };
   } catch (e) {
     return { ok: false, error: String(e) };
