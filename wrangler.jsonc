@@ -6,12 +6,12 @@
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  // Домены приёма бота. Старт — один домен mailbot.click.
-  // emailbot.ru НЕ здесь: он остаётся на Yandex под русский лендинг (бот туда не вешаем).
-  // Мультидомен в коде сохранён (resolve/pickDomain): запасные домены приёма добавим позже,
-  // тогда список станет, напр., "mailbot.click,<backup>". RU-локаль → первый .ru, иначе первый не-.ru.
+  // Домены приёма. Первый не-.ru — дежурный (на нём pickDomain выдаёт новые адреса);
+  // остальные продолжают принимать уже выданные адреса. Сейчас дежурный — ddress.site,
+  // mailbot.click оставлен для приёма ранее выданных. Оба на Cloudflare Email Routing
+  // (catch-all → этот воркер). emailbot.ru НЕ здесь: он на Yandex под русский лендинг.
   "vars": {
-    "DOMAINS": "mailbot.click",
+    "DOMAINS": "ddress.site,mailbot.click",
     "PROMO_BASE": "https://301.st/",
     "BOX_TTL_HOURS": "24",
     "MAX_ACTIVE_BOXES": "2",
