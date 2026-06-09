@@ -8,8 +8,15 @@ export const POLL_FAST_MS = 2500; // ожидание OTP — низкая за�
 export const POLL_SLOW_MS = 12000; // фон открытого окна — экономный темп
 export const POLL_ACTIVE_MS = 60000; // длительность «окна ожидания» после триггера
 export const POLL_OPEN_MS = POLL_FAST_MS; // backwards-compat alias
+export const POLL_FALLBACK_MS = 15000; // safety-поллинг пока попап открыт (push не 100%)
+
+// Firefox: Web Push невозможен (нет SW). Closed-state будим фоновым alarm-поллингом.
 export const POLL_ALARM_NAME = 'inbox-poll';
-export const POLL_ALARM_MIN = 1; // фоновый alarm (минимум MV3)
+export const POLL_ALARM_MIN = 1; // минимум интервала alarm в FF
+
+// VAPID public key (applicationServerKey). Публичный — зеркалит src/push.js на сервере.
+export const VAPID_PUBLIC =
+  'BN_UAqwCiOlWajmBMFk2XQJmGAalX6uYsyOQGpUmNPBQfj_j7XGA7SptwjgFfKkQkBR37uMmxoxRt7Df3-QxUKo';
 
 export const STORAGE = {
   secret: 'mb_device_secret', // device-token (секрет, только local)

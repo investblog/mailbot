@@ -3,7 +3,8 @@ import { applyI18n, t, lang } from '@shared/i18n';
 import { initTheme, toggleTheme, getTheme } from '@shared/theme';
 import { send } from '@shared/protocol';
 import { renderBody } from '@shared/render';
-import { POLL_FAST_MS, POLL_SLOW_MS, POLL_ACTIVE_MS } from '@shared/constants';
+import { POLL_FALLBACK_MS } from '@shared/constants';
+import { getStoreInfo } from '@shared/store-links';
 import type { BoxDTO, MessageDTO } from '@shared/types';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -22,8 +23,32 @@ function updateThemeIcon(): void {
 updateThemeIcon();
 $('#theme-toggle').addEventListener('click', () => { toggleTheme(); updateThemeIcon(); });
 
-// --- panel toggle: попап → открыть боковую панель; панель → свернуть её ---
+// --- side panel: попап разворачивает докнутую панель (chrome) / сайдбар (firefox); панель → сворачивает себя ---
 const sidePanel = (browser as { sidePanel?: { open(opts: { windowId?: number }): Promise<void> } }).sidePanel;
+const sidebarAction = (browser as { sidebarAction?: { open(): Promise<void> } }).sidebarAction;
+const canOpenPanel = !isSidepanel && (!!sidePanel?.open || !!sidebarAction?.open);
+
+// windowId кэшируем заранее: sidePanel.open() требует user-gesture, а `await` ПЕРЕД ним
+// «съедает» жест (Chrome) → open молча отклоняется. С кэшем зовём open синхронно в обработчике.
+let curWindowId: number | undefined;
+if (canOpenPanel && sidePanel?.open) browser.windows.getCurrent().then((w) => { curWindowId = w.id; }).catch(() => { /* ignore */ });
+
+function openSidePanel(): void {
+  if (sidePanel?.open) { // chrome/edge
+    if (curWindowId != null) {
+      try { void sidePanel.open({ windowId: curWindowId }); window.close(); } catch { /* ignore */ }
+    } else {
+      // windowId ещё не закэширован (редко) — фолбэк с await; жест может потеряться.
+      browser.windows.getCurrent()
+        .then((w) => sidePanel.open({ windowId: w.id }))
+        .then(() => window.close())
+        .catch(() => { /* ignore */ });
+    }
+  } else if (sidebarAction?.open) { // firefox
+    try { void sidebarAction.open(); window.close(); } catch { /* ignore */ }
+  }
+}
+
 const pin = $('#pin');
 if (isSidepanel) {
   // уже в панели — кнопка её сворачивает (закрытие страницы панели = collapse)
@@ -32,16 +57,24 @@ if (isSidepanel) {
   pin.title = t('collapse');
   pin.setAttribute('aria-label', t('collapse'));
   pin.addEventListener('click', () => window.close());
-} else if (sidePanel?.open) {
-  // в попапе — кнопка разворачивает докнутую панель
+} else if (canOpenPanel) {
   pin.hidden = false;
-  pin.addEventListener('click', async () => {
-    try {
-      const w = await browser.windows.getCurrent();
-      await sidePanel.open({ windowId: w.id });
-      window.close();
-    } catch { /* ignore */ }
-  });
+  pin.addEventListener('click', openSidePanel);
+}
+
+// --- footer: review-ссылка стора (per-browser; появится, когда в store-links задан URL) ---
+const store = getStoreInfo();
+if (store) {
+  const review = document.createElement('a');
+  review.className = 'footer-review';
+  review.href = store.url;
+  review.target = '_blank';
+  review.rel = 'noreferrer';
+  review.title = `${t('rateUs')} · ${store.label}`;
+  const icon = document.createElement('img');
+  icon.src = store.icon; icon.width = 14; icon.height = 14; icon.alt = '';
+  review.append(icon, document.createTextNode(t('rateUs')));
+  $('.footer-left').prepend(review);
 }
 
 // --- copy с success-фидбеком (house) ---
@@ -85,13 +118,32 @@ function openDrawer(m: MessageDTO): void {
   const title = document.createElement('h2');
   title.className = 'drawer__title';
   title.textContent = m.subject || '(no subject)';
+  const actions = document.createElement('div');
+  actions.className = 'drawer__actions';
+
+  // В попапе — кнопка «открыть это письмо в боковой панели» (комфортнее читать).
+  if (canOpenPanel) {
+    const expand = document.createElement('button');
+    expand.className = 'drawer__close';
+    expand.type = 'button';
+    expand.title = t('pin');
+    expand.setAttribute('aria-label', t('pin'));
+    expand.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-panel-open"></use></svg>';
+    expand.addEventListener('click', () => {
+      void browser.storage.local.set({ mb_open_msg: m.id }); // панель откроет это же письмо
+      openSidePanel();
+    });
+    actions.appendChild(expand);
+  }
+
   const closeBtn = document.createElement('button');
   closeBtn.className = 'drawer__close';
   closeBtn.type = 'button';
   closeBtn.title = t('close');
   closeBtn.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-close"></use></svg>';
   closeBtn.addEventListener('click', close);
-  header.append(title, closeBtn);
+  actions.appendChild(closeBtn);
+  header.append(title, actions);
 
   const body = document.createElement('div');
   body.className = 'drawer__body';
@@ -127,6 +179,70 @@ function openDrawer(m: MessageDTO): void {
   drawer.append(overlay, panel);
   document.body.appendChild(drawer);
   document.addEventListener('keydown', onKey);
+}
+
+// --- confirm dialog (стиль оригинального 301-ui .dialog) ---
+function confirmDialog(opts: {
+  title: string; message: string; emphasis?: string;
+  confirm: string; cancel: string; variant?: 'warning' | 'danger' | 'info';
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('div');
+    dlg.className = `dialog${opts.variant ? ` dialog--${opts.variant}` : ''}`;
+    const done = (v: boolean): void => {
+      dlg.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(v);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') done(false);
+      else if (e.key === 'Enter') done(true);
+    };
+
+    const overlay = document.createElement('div');
+    overlay.className = 'dialog__overlay';
+    overlay.addEventListener('click', () => done(false));
+
+    const panel = document.createElement('div');
+    panel.className = 'dialog__panel';
+
+    const header = document.createElement('div');
+    header.className = 'dialog__header';
+    const title = document.createElement('h2');
+    title.className = 'dialog__title';
+    title.textContent = opts.title;
+    header.appendChild(title);
+
+    const body = document.createElement('div');
+    body.className = 'dialog__body';
+    body.textContent = opts.message;
+    if (opts.emphasis) {
+      body.appendChild(document.createElement('br'));
+      const strong = document.createElement('strong');
+      strong.textContent = opts.emphasis;
+      body.appendChild(strong);
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'dialog__footer';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn';
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = opts.cancel;
+    cancelBtn.addEventListener('click', () => done(false));
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn btn--tg';
+    okBtn.type = 'button';
+    okBtn.textContent = opts.confirm;
+    okBtn.addEventListener('click', () => done(true));
+    footer.append(cancelBtn, okBtn);
+
+    panel.append(header, body, footer);
+    dlg.append(overlay, panel);
+    document.body.appendChild(dlg);
+    document.addEventListener('keydown', onKey);
+    okBtn.focus();
+  });
 }
 
 // --- inbox ---
@@ -183,17 +299,25 @@ function renderMessages(messages: MessageDTO[]): void {
   }
 }
 
-let lastCount = -1;
+let lastMessages: MessageDTO[] = [];
 
 function renderState(boxes: BoxDTO[], messages: MessageDTO[]): void {
   current = boxes[0] || null;
   $('#addr').textContent = current ? current.address : '—';
   $('#addr-meta').textContent = current ? fmtExpiry(current) : '';
   const shown = messages.filter((m) => !current || m.address === current.address);
-  // Пришло новое письмо → продлеваем «окно ожидания» (вдруг прилетит ещё код).
-  if (lastCount >= 0 && shown.length > lastCount) bumpActive();
-  lastCount = shown.length;
+  lastMessages = shown;
   renderMessages(shown);
+}
+
+// Открыли письмо в панели из дровера попапа → панель при загрузке открывает его же.
+async function maybeOpenDeepLink(): Promise<void> {
+  if (!isSidepanel) return;
+  const id = (await browser.storage.local.get('mb_open_msg')).mb_open_msg as string | undefined;
+  if (!id) return;
+  await browser.storage.local.remove('mb_open_msg');
+  const m = lastMessages.find((x) => x.id === id);
+  if (m) openDrawer(m);
 }
 
 async function refresh(type: 'GET_STATE' | 'NEW_BOX' | 'EXTEND' | 'DELETE' | 'POLL', address?: string): Promise<void> {
@@ -204,42 +328,52 @@ async function refresh(type: 'GET_STATE' | 'NEW_BOX' | 'EXTEND' | 'DELETE' | 'PO
   if (type !== 'POLL') $('#addr-meta').textContent = t('error');
 }
 
-// --- умный поллинг: быстрый темп в «окне ожидания», бэкофф вне его, пауза на hidden ---
-let activeUntil = 0;
+// --- Доставка: основной сигнал — Web Push (SW шлёт NEW_MAIL → мгновенный refresh).
+// Поверх — лёгкий safety-поллинг пока окно открыто (push не 100%); пауза на скрытой вкладке.
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 
-function bumpActive(): void { activeUntil = Date.now() + POLL_ACTIVE_MS; }
-
-function scheduleNext(): void {
+function scheduleFallback(): void {
   clearTimeout(pollTimer);
-  if (document.hidden) return; // вкладка скрыта → не опрашиваем
-  const delay = Date.now() < activeUntil ? POLL_FAST_MS : POLL_SLOW_MS;
-  pollTimer = setTimeout(() => void tick(), delay);
+  if (document.hidden) return;
+  pollTimer = setTimeout(async () => { await refresh('POLL'); scheduleFallback(); }, POLL_FALLBACK_MS);
 }
 
-async function tick(): Promise<void> {
-  await refresh('POLL');
-  scheduleNext();
-}
-
-// Действие пользователя → свежее состояние + переход в быстрый темп.
+// Действие пользователя → свежее состояние + перезавод fallback-таймера.
 async function userAction(type: 'NEW_BOX' | 'EXTEND' | 'DELETE', address?: string): Promise<void> {
   await refresh(type, address);
-  bumpActive();
-  scheduleNext();
+  scheduleFallback();
 }
+
+// Push о новом письме (из background SW) → обновляемся немедленно.
+browser.runtime.onMessage.addListener(((msg: { type?: string }) => {
+  if (msg?.type === 'NEW_MAIL') void refresh('POLL');
+}) as any);
 
 $('#copy-addr').addEventListener('click', (e) => { if (current) copy(current.address, e.currentTarget as HTMLElement); });
 $('#addr').addEventListener('click', () => { if (current) copy(current.address, $('#copy-addr')); });
-$('#new').addEventListener('click', () => void userAction('NEW_BOX'));
+$('#new').addEventListener('click', () => {
+  // Новый адрес вытесняет текущий из UI (старый с его кодами больше не показывается) → предупреждаем.
+  if (!current) { void userAction('NEW_BOX'); return; }
+  const addr = current.address;
+  void (async () => {
+    const ok = await confirmDialog({
+      title: t('newConfirmTitle'),
+      message: t('newConfirmBody'),
+      emphasis: addr,
+      confirm: t('new'),
+      cancel: t('cancel'),
+      variant: 'warning',
+    });
+    if (ok) void userAction('NEW_BOX');
+  })();
+});
 $('#extend').addEventListener('click', () => { if (current) void userAction('EXTEND', current.address); });
 $('#delete').addEventListener('click', () => { if (current) void userAction('DELETE', current.address); });
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) clearTimeout(pollTimer);
-  else { bumpActive(); void tick(); } // вернулись на вкладку → опрос сразу + быстрый темп
+  else { void refresh('POLL'); scheduleFallback(); } // вернулись → опрос сразу + перезавод
 });
 window.addEventListener('unload', () => clearTimeout(pollTimer));
 
-bumpActive();
-void (async () => { await refresh('GET_STATE'); scheduleNext(); })();
+void (async () => { await refresh('GET_STATE'); await maybeOpenDeepLink(); scheduleFallback(); })();

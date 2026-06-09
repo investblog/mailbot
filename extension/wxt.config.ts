@@ -21,10 +21,12 @@ export default defineConfig({
     description: 'Disposable email addresses with OTP detection, right in your browser.',
     homepage_url: 'https://mailbot.click',
 
-    // Доступ только к нашему API (CORS на сервере = *). sidePanel — chrome/edge.
+    // Доступ только к нашему API (CORS на сервере = *). notifications — нотификации/Web Push.
+    // Chrome/Edge: push (SW) + sidePanel, alarms не нужен. Firefox: push невозможен →
+    // closed-state на alarm-поллинге, поэтому alarms; sidePanel у FF нет (sidebar_action).
     permissions: browser === 'firefox'
-      ? ['storage', 'alarms', 'notifications']
-      : ['storage', 'alarms', 'notifications', 'sidePanel'],
+      ? ['storage', 'notifications', 'alarms']
+      : ['storage', 'notifications', 'sidePanel'],
     host_permissions: ['https://api.mailbot.click/*'],
 
     icons: {

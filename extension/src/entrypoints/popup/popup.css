@@ -112,6 +112,7 @@ body.sidepanel { width: 100%; height: 100vh; max-height: none; }
   padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
 }
 .drawer__title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); margin: 0; word-break: break-word; }
+.drawer__actions { display: flex; gap: var(--space-1); align-items: center; flex-shrink: 0; }
 .drawer__close {
   display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
   border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: var(--radius); flex-shrink: 0;
@@ -124,13 +125,65 @@ body.sidepanel { width: 100%; height: 100vh; max-height: none; }
 .msg-body a { color: var(--tg); }
 .msg-attach { font-size: var(--fs-xs); color: var(--text-muted); }
 
+/* Confirm dialog (порт оригинального 301-ui .dialog) */
+.dialog {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center; padding: var(--space-4);
+}
+.dialog__overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); cursor: pointer; }
+.dialog__panel {
+  position: relative; width: 100%; max-width: 480px; background: var(--bg);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column; overflow: hidden; animation: dialogFadeIn 0.2s ease-out;
+}
+/* Цветной акцент слева (как в 301-ui) */
+.dialog--danger .dialog__panel::before,
+.dialog--warning .dialog__panel::before,
+.dialog--info .dialog__panel::before {
+  content: ''; position: absolute; inset: 0; border-left: 4px solid currentColor;
+  border-radius: inherit; pointer-events: none;
+}
+.dialog--danger .dialog__panel::before { color: var(--danger); }
+.dialog--warning .dialog__panel::before { color: var(--warning); }
+.dialog--info .dialog__panel::before { color: var(--primary); }
+@keyframes dialogFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+.dialog__header { padding: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
+.dialog__title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); margin: 0; }
+.dialog__body { padding: var(--space-4); color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.5; }
+.dialog__body strong { color: var(--text); font-weight: var(--fw-medium); word-break: break-all; }
+.dialog__footer {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-4); border-top: 1px solid var(--border-subtle); background: var(--panel);
+}
+.dialog__footer .btn { flex: 0 0 auto; }
+
 /* Footer (house) */
 .popup__footer {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   padding: var(--space-2) var(--space-4); border-top: 1px solid var(--border-subtle); background: var(--panel);
   flex-shrink: 0; font-size: var(--fs-xs);
 }
-.footer-link { color: var(--text-muted); text-decoration: none; }
-.footer-link:hover { color: var(--text); }
-.icon-link { display: inline-flex; color: var(--text-muted); }
-.icon-link:hover { color: var(--text); }
+.footer-left { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.footer-social-group { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+
+/* review-ссылка стора (иконка + «оценить») */
+.footer-review {
+  display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
+  color: var(--text-muted); padding: 3px 6px; border-radius: var(--radius);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.footer-review:hover { color: var(--text); background: var(--primary-soft); }
+.footer-review img { display: block; width: 14px; height: 14px; flex-shrink: 0; }
+
+/* спонсор: «сделано в» + лого 301.st */
+.footer-sponsor {
+  display: inline-flex; align-items: center; gap: var(--space-1); text-decoration: none;
+  color: var(--text-subtle); transition: color var(--transition-fast);
+}
+.footer-sponsor:hover { color: var(--text-muted); }
+.ic-301 { display: block; width: 14px; height: 14px; flex-shrink: 0; }
+
+/* соц-иконки (github / telegram) */
+.footer-social { display: inline-flex; color: var(--text-subtle); transition: color var(--transition-fast); }
+.footer-social:hover { color: var(--text-muted); }
+.footer-social .ic { width: 14px; height: 14px; }

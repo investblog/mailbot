@@ -33,3 +33,10 @@ export const deleteBox = (address: string): Promise<any> =>
 
 export const getMessages = (cursor = ''): Promise<{ messages: MessageDTO[]; next_cursor: string }> =>
   call('/api/messages' + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''));
+
+// Web Push: sub = PushSubscription.toJSON() ({endpoint, keys:{p256dh, auth}}).
+export const pushSubscribe = (sub: unknown): Promise<unknown> =>
+  call('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+
+export const pushUnsubscribe = (endpoint: string): Promise<unknown> =>
+  call('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) });
