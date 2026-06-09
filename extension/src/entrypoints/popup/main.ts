@@ -4,6 +4,7 @@ import { initTheme, toggleTheme, getTheme } from '@shared/theme';
 import { send } from '@shared/protocol';
 import { renderBody } from '@shared/render';
 import { POLL_FALLBACK_MS } from '@shared/constants';
+import { getStoreInfo } from '@shared/store-links';
 import type { BoxDTO, MessageDTO } from '@shared/types';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -59,6 +60,21 @@ if (isSidepanel) {
 } else if (canOpenPanel) {
   pin.hidden = false;
   pin.addEventListener('click', openSidePanel);
+}
+
+// --- footer: review-ссылка стора (per-browser; появится, когда в store-links задан URL) ---
+const store = getStoreInfo();
+if (store) {
+  const review = document.createElement('a');
+  review.className = 'footer-review';
+  review.href = store.url;
+  review.target = '_blank';
+  review.rel = 'noreferrer';
+  review.title = `${t('rateUs')} · ${store.label}`;
+  const icon = document.createElement('img');
+  icon.src = store.icon; icon.width = 14; icon.height = 14; icon.alt = '';
+  review.append(icon, document.createTextNode(t('rateUs')));
+  $('.footer-left').prepend(review);
 }
 
 // --- copy с success-фидбеком (house) ---
