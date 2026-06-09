@@ -23,7 +23,9 @@ export async function maybePromo(env, cfg, owner, row) {
   // encodeURIComponent: owner.id может содержать символы будущих клиентов, не тащим в query сырьём.
   const cid = encodeURIComponent(owner.id);
   const url = `${cfg.promoBase}?utm_source=gotemailbot&utm_campaign=otp_heavy&cid=${cid}`;
+  // Ссылка идёт в HTML-href (parse_mode=HTML) как кликабельный «301.st» — экранируем & разделителей.
+  const urlAttr = url.replace(/&/g, '&amp;');
   const s = strings(row.locale || owner.locale);
-  const res = await sendMessage(env, owner.external_id, fmt(s.promo, { url }));
+  const res = await sendMessage(env, owner.external_id, fmt(s.promo, { url: urlAttr }));
   return res.ok;
 }

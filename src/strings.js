@@ -22,7 +22,7 @@ const S = {
     from: 'от:', noSubject: '(без темы)', links: '🔗 ссылки:', emptyBody: '(пустое тело)',
     promo:
       'Гоняешь OTP пачками — похоже, ты вебмастер.\n' +
-      '301.st: клоак/TDS под арбитражный трафик.\n{url}',
+      '<a href="{url}">301.st</a> — клоак/TDS под арбитражный трафик.',
   },
   en: {
     btnNew: 'New address', btnExtend: 'Extend', btnHelp: 'Help',
@@ -40,7 +40,7 @@ const S = {
     from: 'from:', noSubject: '(no subject)', links: '🔗 links:', emptyBody: '(empty body)',
     promo:
       "You're catching OTPs in bulk — looks like you're a webmaster.\n" +
-      '301.st: cloak/TDS for arbitrage traffic.\n{url}',
+      '<a href="{url}">301.st</a> — cloak/TDS for arbitrage traffic.',
   },
 };
 
