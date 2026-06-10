@@ -8,6 +8,18 @@ Disposable email, inside Telegram. Press `/start`, get an address, paste it anyw
 
 **Try it:** [@gotemailbot](https://t.me/gotemailbot) · [mailbot.click](https://mailbot.click) (EN) · [emailbot.ru](https://emailbot.ru) (RU)
 
+## Install
+
+The browser extension is built and **submitted to the stores — listings are in review.** Links land here as each store approves:
+
+| Browser | Status |
+|---------|--------|
+| Chrome  | 🔄 In review — _Chrome Web Store link coming soon_ |
+| Edge    | 🔄 In review — _Edge Add-ons link coming soon_ |
+| Firefox | 🔄 In review — _Firefox Add-ons link coming soon_ |
+
+Meanwhile you can use the [Telegram bot](https://t.me/gotemailbot) right now, or build the extension from source (see [Development](#development)).
+
 ## Features
 
 - **OTP on the first line** — smart scoring extracts the verification code and puts it first; tap to copy
@@ -58,7 +70,7 @@ SPEC.md         technical specification
 Two clients sit on one client-agnostic **email-core** (owner abstraction + `deliver(owner,msg)` seam):
 
 - **Telegram bot** ([@gotemailbot](https://t.me/gotemailbot)) — delivers to chat, **stores nothing**.
-- **Browser extension** (`extension/`, WXT) — popup/side-panel inbox with OTP detection. Anonymous device-token auth; incoming events are stored server-side in D1 (text only, 24h TTL). Real-time delivery via **Web Push** (Chrome/Edge) with an alarm-poll fallback (Firefox). _Chrome / Edge / Firefox builds are being submitted to the stores — listings coming soon._
+- **Browser extension** (`extension/`, WXT) — popup/side-panel inbox with OTP detection. Anonymous device-token auth; incoming events are stored server-side in D1 (text only, 24h TTL). Real-time delivery via **Web Push** (Chrome/Edge) with an alarm-poll fallback (Firefox). Chrome / Edge / Firefox builds are **in review** — see [Install](#install).
 
 ## Development
 
