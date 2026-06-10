@@ -1,3 +1,5 @@
+![MailBot](assets/banner-1400x560.png)
+
 # MailBot
 
 Disposable email, inside Telegram. Press `/start`, get an address, paste it anywhere — every message lands in your chat with the **OTP code on the first line**. Addresses live 24h and expire on their own. Edge-first, nothing stored.
