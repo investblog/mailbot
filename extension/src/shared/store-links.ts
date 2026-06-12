@@ -9,7 +9,7 @@ export interface StoreInfo {
 
 const STORES: Record<string, StoreInfo> = {
   chrome: {
-    url: '', // TODO: https://chromewebstore.google.com/detail/<id>/reviews
+    url: 'https://chromewebstore.google.com/detail/mmjdbaijmhogoepflomfceeppgdbeelb/reviews',
     icon: '/store/chrome.svg',
     label: 'Chrome Web Store',
   },
