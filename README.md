@@ -5,6 +5,7 @@
 Disposable email, inside Telegram. Press `/start`, get an address, paste it anywhere — every message lands in your chat with the **OTP code on the first line**. Addresses live 24h and expire on their own. Edge-first, nothing stored.
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Web%20Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/mmjdbaijmhogoepflomfceeppgdbeelb?utm_source=github)
+[![Firefox Add-ons](https://img.shields.io/badge/Firefox-Add--ons-FF7139?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/firefox/addon/mailbot-disposable-email/?utm_source=github)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-%40gotemailbot-2CA5E0?logo=telegram&logoColor=white)](https://t.me/gotemailbot)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
@@ -13,13 +14,13 @@ Disposable email, inside Telegram. Press `/start`, get an address, paste it anyw
 
 ## Install
 
-The browser extension is **live on the Chrome Web Store**; Edge and Firefox are in review. Links land here as each store approves:
+The browser extension is **live on the Chrome Web Store and Firefox Add-ons**; Edge is in review. Links land here as each store approves:
 
 | Browser | Status |
 |---------|--------|
 | Chrome  | ✅ [**Install from the Chrome Web Store**](https://chromewebstore.google.com/detail/mmjdbaijmhogoepflomfceeppgdbeelb?utm_source=github) |
 | Edge    | 🔄 In review — _Edge Add-ons link coming soon_ |
-| Firefox | 🔄 In review — _Firefox Add-ons link coming soon_ |
+| Firefox | ✅ [**Install from Firefox Add-ons**](https://addons.mozilla.org/firefox/addon/mailbot-disposable-email/?utm_source=github) |
 
 Meanwhile you can use the [Telegram bot](https://t.me/gotemailbot) right now, or build the extension from source (see [Development](#development)).
 
@@ -73,7 +74,7 @@ SPEC.md         technical specification
 Two clients sit on one client-agnostic **email-core** (owner abstraction + `deliver(owner,msg)` seam):
 
 - **Telegram bot** ([@gotemailbot](https://t.me/gotemailbot)) — delivers to chat, **stores nothing**.
-- **Browser extension** (`extension/`, WXT) — popup/side-panel inbox with OTP detection. Anonymous device-token auth; incoming events are stored server-side in D1 (text only, 24h TTL). Real-time delivery via **Web Push** (Chrome/Edge) with an alarm-poll fallback (Firefox). **Live on the Chrome Web Store**; Edge and Firefox in review — see [Install](#install).
+- **Browser extension** (`extension/`, WXT) — popup/side-panel inbox with OTP detection. Anonymous device-token auth; incoming events are stored server-side in D1 (text only, 24h TTL). Real-time delivery via **Web Push** (Chrome/Edge) with an alarm-poll fallback (Firefox). **Live on the Chrome Web Store and Firefox Add-ons**; Edge in review — see [Install](#install).
 
 ## Development
 

@@ -19,7 +19,7 @@ const STORES: Record<string, StoreInfo> = {
     label: 'Edge Add-ons',
   },
   firefox: {
-    url: '', // TODO: https://addons.mozilla.org/firefox/addon/<slug>/
+    url: 'https://addons.mozilla.org/firefox/addon/mailbot-disposable-email/reviews/',
     icon: '/store/mozilla.svg',
     label: 'Firefox Add-ons',
   },
