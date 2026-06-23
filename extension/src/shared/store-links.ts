@@ -14,7 +14,7 @@ const STORES: Record<string, StoreInfo> = {
     label: 'Chrome Web Store',
   },
   edge: {
-    url: '', // TODO: https://microsoftedge.microsoft.com/addons/detail/<id>
+    url: 'https://microsoftedge.microsoft.com/addons/detail/mailbot-%E2%80%94-disposable-emai/ofaahjfcjogpimmiocambhenlmagdhgj',
     icon: '/store/edge.svg',
     label: 'Edge Add-ons',
   },
