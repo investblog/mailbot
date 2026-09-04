@@ -9,10 +9,12 @@
   // Домены приёма. Первый не-.ru — дежурный (на нём pickDomain выдаёт новые адреса);
   // остальные продолжают принимать уже выданные адреса. Сейчас дежурный — ddress.site,
   // mailbot.click оставлен для приёма ранее выданных. Оба на Cloudflare Email Routing
-  // (catch-all → этот воркер). emailbot.ru НЕ здесь: он на Yandex под русский лендинг.
+  // (catch-all → этот воркер). emailbot.ru НЕ здесь: почта на Yandex; веб — 301 на ru.mailbot.click (GitHub Pages).
   "vars": {
     "DOMAINS": "ddress.site,mailbot.click",
     "PROMO_BASE": "https://301.st/",
+    "CATCHALL_PROMO": "on",
+    "CATCHALL_BASE": "https://catchall.in/",
     "BOX_TTL_HOURS": "24",
     "MAX_ACTIVE_BOXES": "2",
     "RL_PER_HOUR": "30",

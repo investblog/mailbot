@@ -11,7 +11,7 @@ Disposable email, inside Telegram. Press `/start`, get an address, paste it anyw
 [![Telegram](https://img.shields.io/badge/Telegram-%40gotemailbot-2CA5E0?logo=telegram&logoColor=white)](https://t.me/gotemailbot)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 
-**Try it:** [@gotemailbot](https://t.me/gotemailbot) · [mailbot.click](https://mailbot.click) (EN) · [emailbot.ru](https://emailbot.ru) (RU)
+**Try it:** [@gotemailbot](https://t.me/gotemailbot) · [mailbot.click](https://mailbot.click) (EN) · [ru.mailbot.click](https://ru.mailbot.click) (RU)
 
 ## Install
 

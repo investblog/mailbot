@@ -6,14 +6,17 @@ import { activeBoxes, extendBox, provisionBox } from './boxes.js';
 import { upsertOwner, ensureOwner } from './owners.js';
 import { sendMessage, answerCallback, keyboard, esc } from './telegram.js';
 import { strings, fmt } from './strings.js';
+import { limitPromo } from './promo.js';
 
 const KIND = 'telegram';
 
-function kb(s) {
-  return keyboard([
+function kb(s, extraRow) {
+  const rows = [
     [{ text: s.btnNew, callback_data: 'new' }, { text: s.btnExtend, callback_data: 'extend' }],
     [{ text: s.btnHelp, callback_data: 'help' }],
-  ]);
+  ];
+  if (extraRow) rows.push(extraRow);
+  return keyboard(rows);
 }
 
 function fmtAddress(s, address, expiresAt, max) {
@@ -33,6 +36,25 @@ function fmtNewBox(s, cfg, box) {
 
 // Создаёт адрес для владельца (общая core-логика). null если упёрлись в rate-limit на /new.
 const newAddress = (env, cfg, owner, locale) => provisionBox(env, cfg, owner, locale);
+
+// Сообщение о лимите + промо Catchall (если положено): приписка к тексту и URL-кнопка
+// отдельной строкой под основной клавиатурой. reason — см. limitPromo().
+async function sendWithLimitPromo(env, cfg, owner, s, chatId, text, reason) {
+  const p = await limitPromo(env, cfg, owner, s, reason);
+  if (!p) return sendMessage(env, chatId, text, kb(s));
+  return sendMessage(env, chatId, `${text}\n\n${p.text}`, kb(s, [p.button]));
+}
+
+// Rate-limit на /new — момент «хочу больше адресов».
+const sendLimited = (env, cfg, owner, s, chatId) =>
+  sendWithLimitPromo(env, cfg, owner, s, chatId, s.rlMsg, 'rate');
+
+// Новый адрес; если он вытеснил старый (лимит активных) — тоже момент потребности.
+function sendNewBox(env, cfg, owner, s, chatId, box) {
+  const text = fmtNewBox(s, cfg, box);
+  if (!box.evicted?.length) return sendMessage(env, chatId, text, kb(s));
+  return sendWithLimitPromo(env, cfg, owner, s, chatId, text, 'evict');
+}
 
 export async function handleUpdate(update, env) {
   const cfg = config(env);
@@ -55,15 +77,15 @@ async function handleMessage(msg, env, cfg) {
       return sendMessage(env, chatId, fmtAddress(s, `${b.localpart}@${b.domain}`, b.expires_at, cfg.maxActive), kb(s));
     }
     const box = await newAddress(env, cfg, owner, locale);
-    if (!box) return sendMessage(env, chatId, s.rlMsg, kb(s));
-    return sendMessage(env, chatId, fmtNewBox(s, cfg, box), kb(s));
+    if (!box) return sendLimited(env, cfg, owner, s, chatId);
+    return sendNewBox(env, cfg, owner, s, chatId, box);
   }
 
   if (text.startsWith('/new')) {
     const owner = await ensureOwner(env, KIND, chatId, locale); // без +session
     const box = await newAddress(env, cfg, owner, locale);
-    if (!box) return sendMessage(env, chatId, s.rlMsg, kb(s));
-    return sendMessage(env, chatId, fmtNewBox(s, cfg, box), kb(s));
+    if (!box) return sendLimited(env, cfg, owner, s, chatId);
+    return sendNewBox(env, cfg, owner, s, chatId, box);
   }
 
   if (text.startsWith('/help')) return sendMessage(env, chatId, s.help, kb(s));
@@ -82,10 +104,10 @@ async function handleCallback(cq, env, cfg) {
     const owner = await ensureOwner(env, KIND, chatId, locale);
     const box = await newAddress(env, cfg, owner, locale);
     if (!box) {
-      await sendMessage(env, chatId, s.rlMsg, kb(s));
+      await sendLimited(env, cfg, owner, s, chatId);
       return answerCallback(env, cq.id, s.limit);
     }
-    await sendMessage(env, chatId, fmtNewBox(s, cfg, box), kb(s));
+    await sendNewBox(env, cfg, owner, s, chatId, box);
     return answerCallback(env, cq.id, s.okNew);
   }
 

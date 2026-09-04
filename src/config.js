@@ -12,6 +12,10 @@ export function config(env) {
     newPerDay: Number(env.NEW_PER_DAY || 20),
     maxRawBytes: Number(env.MAX_RAW_KB || 1024) * 1024, // дефолт 1 MiB; больше — reject до парса
     promoBase: env.PROMO_BASE || 'https://301.st/',
+    // Промо Catchall в момент лимита. Выключено, пока на catchall.in нет приёма оплаты
+    // (инвойс — заглушка): вести туда трафик раньше — тупик за формой регистрации.
+    catchallPromo: String(env.CATCHALL_PROMO || 'off').toLowerCase() === 'on',
+    catchallBase: env.CATCHALL_BASE || 'https://catchall.in/',
   };
 }
 

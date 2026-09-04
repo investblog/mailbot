@@ -29,3 +29,27 @@ export async function maybePromo(env, cfg, owner, row) {
   const res = await sendMessage(env, owner.external_id, fmt(s.promo, { url: urlAttr }));
   return res.ok;
 }
+
+// Промо Catchall в момент лимита: пользователь только что упёрся в лимит адресов
+// (rate-limit на /new или вытеснение старого адреса) — точный момент потребности в «своём
+// домене без лимитов». Поверхность — приписка к сообщению о лимите + URL-кнопка.
+// Флаг cfg.catchallPromo (env CATCHALL_PROMO=on) — выключен до запуска оплаты на catchall.in.
+// Частота — раз в сутки на владельца через KV с TTL (колонок в owners не добавляем).
+// Fail-closed: сбой KV → не показываем (в отличие от лимитера, здесь тишина безопаснее спама).
+// reason ∈ {'rate','evict'} — идёт в utm_campaign, чтобы видеть, какой момент конвертит.
+const LIMIT_PROMO_TTL = 24 * 3600;
+
+export async function limitPromo(env, cfg, owner, s, reason) {
+  if (!cfg.catchallPromo) return null;
+  if (!owner || owner.kind !== 'telegram') return null;
+  const key = `promo:limit:${owner.id}`;
+  try {
+    if ((await env.RL.get(key)) !== null) return null;
+    await env.RL.put(key, '1', { expirationTtl: LIMIT_PROMO_TTL });
+  } catch {
+    return null;
+  }
+  const cid = encodeURIComponent(owner.id);
+  const url = `${cfg.catchallBase}?utm_source=gotemailbot&utm_medium=bot&utm_campaign=limit_${reason}&cid=${cid}`;
+  return { text: s.promoLimit, button: { text: s.btnCatchall, url } };
+}
