@@ -32,11 +32,15 @@ export async function maybePromo(env, cfg, owner, row) {
 
 // Промо Catchall в момент лимита: пользователь только что упёрся в лимит адресов
 // (rate-limit на /new или вытеснение старого адреса) — точный момент потребности в «своём
-// домене без лимитов». Поверхность — приписка к сообщению о лимите + URL-кнопка.
+// домене без лимитов». Поверхность — приписка к сообщению о лимите + URL-кнопка на бота
+// Catchall в Telegram (@allinmailbot): для аудитории бота это нативнее сайта — один тап, без
+// браузера. Ссылка — deep link t.me/<bot>?start=<payload>: Catchall получает payload в /start
+// и видит источник и момент показа.
 // Флаг cfg.catchallPromo (env CATCHALL_PROMO=on) — выключен до запуска оплаты на catchall.in.
 // Частота — раз в сутки на владельца через KV с TTL (колонок в owners не добавляем).
 // Fail-closed: сбой KV → не показываем (в отличие от лимитера, здесь тишина безопаснее спама).
-// reason ∈ {'rate','evict'} — идёт в utm_campaign, чтобы видеть, какой момент конвертит.
+// reason ∈ {'rate','evict'} — идёт в start-payload, чтобы видеть, какой момент конвертит.
+// Payload: `mb_<reason>_<owner.id>` в алфавите Telegram (A-Za-z0-9_-, ≤ 64) — «tg:42» → «tg_42».
 const LIMIT_PROMO_TTL = 24 * 3600;
 
 export async function limitPromo(env, cfg, owner, s, reason) {
@@ -49,7 +53,7 @@ export async function limitPromo(env, cfg, owner, s, reason) {
   } catch {
     return null;
   }
-  const cid = encodeURIComponent(owner.id);
-  const url = `${cfg.catchallBase}?utm_source=gotemailbot&utm_medium=bot&utm_campaign=limit_${reason}&cid=${cid}`;
+  const cid = String(owner.id).replace(/[^A-Za-z0-9_-]/g, '_');
+  const url = `https://t.me/${cfg.catchallBot}?start=${`mb_${reason}_${cid}`.slice(0, 64)}`;
   return { text: s.promoLimit, button: { text: s.btnCatchall, url } };
 }

@@ -23,7 +23,7 @@ test('config: CATCHALL_PROMO выключен по умолчанию, вклю�
   assert.equal(config({ CATCHALL_PROMO: 'off' }).catchallPromo, false);
   assert.equal(config({ CATCHALL_PROMO: 'on' }).catchallPromo, true);
   assert.equal(config({ CATCHALL_PROMO: 'ON' }).catchallPromo, true);
-  assert.equal(config({}).catchallBase, 'https://catchall.in/');
+  assert.equal(config({}).catchallBot, 'allinmailbot');
 });
 
 test('limitPromo: с выключенным флагом — тишина, KV не трогаем', async () => {
@@ -33,25 +33,27 @@ test('limitPromo: с выключенным флагом — тишина, KV н
   assert.equal(env.RL.store.size, 0);
 });
 
-test('limitPromo: включён → текст + URL-кнопка с атрибуцией; повтор в сутки — тишина', async () => {
+test('limitPromo: включён → текст + кнопка-deep-link на бота с атрибуцией в start; повтор в сутки — тишина', async () => {
   const env = { RL: fakeKV() };
   const cfg = config({ CATCHALL_PROMO: 'on' });
   const p = await limitPromo(env, cfg, owner, s, 'rate');
   assert.ok(p);
   assert.equal(p.text, s.promoLimit);
   assert.equal(p.button.text, s.btnCatchall);
-  assert.equal(p.button.url,
-    'https://catchall.in/?utm_source=gotemailbot&utm_medium=bot&utm_campaign=limit_rate&cid=tg%3A42');
+  assert.equal(p.button.url, 'https://t.me/allinmailbot?start=mb_rate_tg_42');
   // второй раз в пределах TTL — null (ключ уже стоит)
   assert.equal(await limitPromo(env, cfg, owner, s, 'evict'), null);
   assert.equal(env.RL.store.get('promo:limit:tg:42'), '1');
 });
 
-test('limitPromo: reason уходит в utm_campaign', async () => {
+test('limitPromo: reason и бот уходят в deep link; payload в алфавите Telegram и ≤ 64', async () => {
   const env = { RL: fakeKV() };
-  const cfg = config({ CATCHALL_PROMO: 'on', CATCHALL_BASE: 'https://x.test/' });
+  const cfg = config({ CATCHALL_PROMO: 'on', CATCHALL_BOT: 'xbot' });
   const p = await limitPromo(env, cfg, owner, s, 'evict');
-  assert.match(p.button.url, /^https:\/\/x\.test\/\?.*utm_campaign=limit_evict&/);
+  assert.equal(p.button.url, 'https://t.me/xbot?start=mb_evict_tg_42');
+  const long = await limitPromo({ RL: fakeKV() }, cfg, { id: 'tg:' + '9'.repeat(80), kind: 'telegram' }, s, 'rate');
+  const payload = new URL(long.button.url).searchParams.get('start');
+  assert.match(payload, /^[A-Za-z0-9_-]{1,64}$/);
 });
 
 test('limitPromo: только telegram-владельцы', async () => {
@@ -72,6 +74,7 @@ test('строки промо есть в обоих языках и содер�
     const t = strings(l);
     assert.match(t.promoLimit, /Catchall/);
     assert.doesNotMatch(t.promoLimit, /catchall\.in/);
-    assert.match(t.btnCatchall, /Catchall/);
+    assert.match(t.btnCatchall, /@allinmailbot/);
+    assert.match(t.promoLimit, /@allinmailbot/);
   }
 });

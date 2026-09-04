@@ -14,7 +14,7 @@
     "DOMAINS": "ddress.site,mailbot.click",
     "PROMO_BASE": "https://301.st/",
     "CATCHALL_PROMO": "on",
-    "CATCHALL_BASE": "https://catchall.in/",
+    "CATCHALL_BOT": "allinmailbot",
     "BOX_TTL_HOURS": "24",
     "MAX_ACTIVE_BOXES": "2",
     "RL_PER_HOUR": "30",

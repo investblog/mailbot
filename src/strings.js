@@ -23,9 +23,9 @@ const S = {
     promo:
       'Гоняешь OTP пачками — похоже, ты вебмастер.\n' +
       '<a href="{url}">301.st</a> — клоак/TDS под арбитражный трафик.',
-    btnCatchall: 'Открыть Catchall',
+    btnCatchall: 'Открыть @allinmailbot',
     promoLimit:
-      'Упёрся в лимит? Catchall даёт сколько угодно адресов на твоём домене: ' +
+      'Упёрся в лимит? @allinmailbot — Catchall в Telegram: сколько угодно адресов на твоём домене, ' +
       '<code>anything@mail.твой-домен</code>, коды по POP3/IMAP. $10 за домен в месяц.',
   },
   en: {
@@ -45,9 +45,9 @@ const S = {
     promo:
       "You're catching OTPs in bulk — looks like you're a webmaster.\n" +
       '<a href="{url}">301.st</a> — cloak/TDS for arbitrage traffic.',
-    btnCatchall: 'Open Catchall',
+    btnCatchall: 'Open @allinmailbot',
     promoLimit:
-      'Hit the limit? Catchall gives you unlimited addresses on your own domain: ' +
+      'Hit the limit? @allinmailbot — Catchall in Telegram: unlimited addresses on your own domain, ' +
       '<code>anything@mail.yourdomain</code>, codes over POP3/IMAP. $10 per domain a month.',
   },
 };
