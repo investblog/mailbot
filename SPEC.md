@@ -232,7 +232,7 @@ Vars (с дефолтами, переопределяются на деплое)
 | `NEW_PER_DAY` | `20` | лимит создания адресов на chat_id в сутки |
 | `MAX_RAW_KB` | `1024` | макс. размер письма (КБ); больше — отбой до парса |
 | `PROMO_BASE` | `https://301.st/` | база промо-ссылки |
-| `CATCHALL_PROMO` | `off` | промо Catchall в момент лимита (§7.1); `on` — после запуска оплаты на catchall.in |
+| `CATCHALL_PROMO` | `off` | промо Catchall в момент лимита (§7.1); дефолт в коде `off`, в `wrangler.jsonc` **`on`** с 04.09.2026 |
 | `CATCHALL_BASE` | `https://catchall.in/` | база ссылки промо Catchall |
 
 Выбор домена: RU-локаль (`language_code` ~ `ru*`) → первый `.ru`, иначе первый не-`.ru`.
